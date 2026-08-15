@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Board from "@/components/board/Board";
 import Hand from "@/components/hand/Hand";
+import OnlinePlayPanel from "@/components/lobby/OnlinePlayPanel";
 import { dealHands } from "@/lib/game/deal";
 import { buildDeck, shuffle } from "@/lib/game/deck";
 import { isDeadCard } from "@/lib/game/deadCard";
@@ -122,6 +123,7 @@ export default function Home() {
     null,
   );
   const [hintsEnabled, setHintsEnabled] = useState(false);
+  const [showOnlinePanel, setShowOnlinePanel] = useState(false);
 
   useEffect(() => {
     setGame(createLocalGame("two-player"));
@@ -344,6 +346,13 @@ export default function Home() {
             />
             Hints
           </label>
+          <button
+            type="button"
+            onClick={() => setShowOnlinePanel(true)}
+            className="rounded border border-blue-500 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 sm:text-sm dark:hover:bg-blue-950"
+          >
+            Play online
+          </button>
         </div>
       </div>
 
@@ -402,6 +411,17 @@ export default function Home() {
           }
         />
       </div>
+
+      {showOnlinePanel ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowOnlinePanel(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <OnlinePlayPanel />
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

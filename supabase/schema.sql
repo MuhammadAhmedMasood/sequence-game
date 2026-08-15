@@ -1,0 +1,322 @@
+-- Sequence multiplayer schema.
+--
+-- Trust model (see CLAUDE.md / the approved plan):
+--   - games, players, moves: public, world-readable — board state, turn
+--     order, and played cards are public info in real Sequence too.
+--   - hands, decks: secret. hands is readable only by its owner (RLS);
+--     decks has no client-facing policies at all (default-deny).
+--   - RLS enforces identity, turn order, and hand/deck secrecy. Move
+--     *content* legality (is this square open, is this really a
+--     sequence) is enforced by the shared TypeScript game-logic module
+--     that every client runs — not re-verified here. This is a
+--     deliberate scope call for a casual game between friends.
+--   - The two SECURITY DEFINER RPCs below are the only place secret
+--     mutations happen; everything else is direct table reads/writes
+--     gated by RLS policies.
+--
+-- Apply this whole file via the Supabase SQL Editor.
+
+create table if not exists games (
+  id uuid primary key default gen_random_uuid(),
+  room_code text unique not null,
+  mode text not null check (mode in ('two-player', 'three-player', 'two-team')),
+  hand_size int not null,
+  sequences_to_win int not null,
+  status text not null default 'lobby' check (status in ('lobby', 'in_progress', 'completed')),
+  board_chips jsonb not null default '{}'::jsonb,
+  sequences jsonb not null default '[]'::jsonb,
+  sequence_usage jsonb not null default '{}'::jsonb,
+  discard_top jsonb,
+  deck_count int not null default 0,
+  current_seat_index int not null default 0,
+  turn_number int not null default 0,
+  winner text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists players (
+  id uuid primary key default gen_random_uuid(),
+  game_id uuid not null references games(id) on delete cascade,
+  auth_user_id uuid not null,
+  display_name text not null,
+  seat_index int not null,
+  team text check (team in ('A', 'B')),
+  chip_color text not null check (chip_color in ('red', 'blue', 'green')),
+  joined_at timestamptz not null default now(),
+  unique (game_id, seat_index),
+  unique (game_id, auth_user_id)
+);
+
+create table if not exists hands (
+  player_id uuid primary key references players(id) on delete cascade,
+  game_id uuid not null references games(id) on delete cascade,
+  auth_user_id uuid not null,
+  cards jsonb not null default '[]'::jsonb
+);
+
+create table if not exists decks (
+  game_id uuid primary key references games(id) on delete cascade,
+  cards jsonb not null default '[]'::jsonb
+);
+
+create table if not exists moves (
+  id bigint generated always as identity primary key,
+  game_id uuid not null references games(id) on delete cascade,
+  player_id uuid not null references players(id),
+  move_number int not null,
+  card jsonb not null,
+  action jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists players_game_id_idx on players(game_id);
+create index if not exists hands_game_id_idx on hands(game_id);
+create index if not exists moves_game_id_idx on moves(game_id);
+
+alter table games   enable row level security;
+alter table players enable row level security;
+alter table moves   enable row level security;
+alter table hands   enable row level security;
+alter table decks   enable row level security;
+
+drop policy if exists "read games" on games;
+create policy "read games" on games for select using (true);
+
+drop policy if exists "read players" on players;
+create policy "read players" on players for select using (true);
+
+drop policy if exists "read moves" on moves;
+create policy "read moves" on moves for select using (true);
+
+drop policy if exists "join as self" on players;
+create policy "join as self" on players for insert
+  with check (auth_user_id = auth.uid());
+
+-- Only the seated player whose turn it currently is may update the game
+-- row — this is the RLS-enforced turn-order check. The explicit
+-- `with check (true)` matters: without it, Postgres reuses the USING
+-- expression as the WITH CHECK too, which would re-evaluate
+-- `games.current_seat_index` against the *new* row — but a turn-ending
+-- move deliberately changes current_seat_index to the *other* player,
+-- so that would reject every legitimate move. USING (checked against the
+-- pre-update row) is the actual turn-order gate; WITH CHECK just needs
+-- to allow the resulting row through.
+drop policy if exists "update on your turn" on games;
+create policy "update on your turn" on games for update
+  using (exists (
+    select 1 from players p
+    where p.game_id = games.id
+      and p.auth_user_id = auth.uid()
+      and p.seat_index = games.current_seat_index
+  ))
+  with check (true);
+
+-- Anyone may create a game row (room creation happens before any player
+-- is seated, so there's no "current player" to check against yet).
+drop policy if exists "create game" on games;
+create policy "create game" on games for insert
+  with check (true);
+
+-- Ownership only (not a turn-order re-check): moves is a log for live UX
+-- (toasts/animations), not the source of truth, and turn order is already
+-- enforced by the `games` update policy above, which the client writes to
+-- in the same flow. Checking games.current_seat_index here too would hit
+-- the same stale-vs-fresh-row problem as above, since by the time this
+-- insert runs the games row has typically already advanced.
+drop policy if exists "log your move" on moves;
+create policy "log your move" on moves for insert
+  with check (exists (
+    select 1 from players p
+    where p.id = moves.player_id
+      and p.auth_user_id = auth.uid()
+  ));
+
+-- hands: read-only, own row only. No insert/update/delete policy at all —
+-- every mutation goes through the SECURITY DEFINER RPCs below.
+drop policy if exists "read own hand" on hands;
+create policy "read own hand" on hands for select
+  using (auth_user_id = auth.uid());
+
+-- decks: no policies at all -> default-deny for every client, always.
+
+-- Deals a fresh 104-card shuffled deck to a lobby game: builds the deck,
+-- shuffles it, deals hand_size cards to each seated player (in seat
+-- order), stores the remainder in decks, and flips the game to
+-- in_progress. Callable only by a player already seated in that game.
+create or replace function deal_game(p_game_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_hand_size int;
+  v_player record;
+  v_deck jsonb[];
+  v_ranks text[] := array['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  v_suits text[] := array['hearts','diamonds','clubs','spades'];
+  v_rank text;
+  v_suit text;
+  v_copy int;
+  v_cursor int := 1;
+  v_deck_len int;
+begin
+  if not exists (
+    select 1 from players
+    where game_id = p_game_id and auth_user_id = auth.uid()
+  ) then
+    raise exception 'not a player in this game';
+  end if;
+
+  select hand_size into v_hand_size from games where id = p_game_id;
+  if v_hand_size is null then
+    raise exception 'game not found';
+  end if;
+
+  v_deck := array[]::jsonb[];
+  for v_copy in 0..1 loop
+    foreach v_suit in array v_suits loop
+      foreach v_rank in array v_ranks loop
+        v_deck := v_deck || jsonb_build_object(
+          'rank', v_rank,
+          'suit', v_suit,
+          'instanceId', v_rank || '-' || v_suit || '-' || v_copy
+        );
+      end loop;
+    end loop;
+  end loop;
+
+  select array_agg(card order by random()) into v_deck from unnest(v_deck) as card;
+  v_deck_len := array_length(v_deck, 1);
+
+  for v_player in select id, auth_user_id from players where game_id = p_game_id order by seat_index loop
+    insert into hands (player_id, game_id, auth_user_id, cards)
+    values (
+      v_player.id,
+      p_game_id,
+      v_player.auth_user_id,
+      to_jsonb(v_deck[v_cursor : v_cursor + v_hand_size - 1])
+    )
+    on conflict (player_id) do update set cards = excluded.cards;
+    v_cursor := v_cursor + v_hand_size;
+  end loop;
+
+  insert into decks (game_id, cards)
+  values (p_game_id, to_jsonb(v_deck[v_cursor : v_deck_len]))
+  on conflict (game_id) do update set cards = excluded.cards;
+
+  update games
+  set status = 'in_progress',
+      deck_count = v_deck_len - (v_cursor - 1),
+      current_seat_index = 0,
+      turn_number = 0
+  where id = p_game_id;
+end;
+$$;
+
+-- Removes the named card instance from the caller's hand and draws one
+-- replacement from the shared deck, returning the caller's updated hand.
+-- Used both for a normal turn-ending play and for a dead-card swap (the
+-- caller decides separately whether to also advance games.current_seat_index
+-- via a direct UPDATE — this RPC only ever touches hands/decks).
+create or replace function play_card_and_draw(
+  p_game_id uuid,
+  p_rank text,
+  p_suit text,
+  p_instance_id text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_player_id uuid;
+  v_hand jsonb;
+  v_card jsonb;
+  v_new_hand jsonb;
+  v_deck jsonb;
+  v_drawn jsonb;
+  v_rest jsonb;
+begin
+  select id into v_player_id from players
+  where game_id = p_game_id and auth_user_id = auth.uid();
+  if v_player_id is null then
+    raise exception 'not a player in this game';
+  end if;
+
+  if not exists (
+    select 1 from players p
+    join games g on g.id = p.game_id
+    where p.id = v_player_id and p.seat_index = g.current_seat_index
+  ) then
+    raise exception 'not your turn';
+  end if;
+
+  select cards into v_hand from hands where player_id = v_player_id;
+
+  select elem into v_card
+  from jsonb_array_elements(coalesce(v_hand, '[]'::jsonb)) elem
+  where elem->>'instanceId' = p_instance_id
+    and elem->>'rank' = p_rank
+    and elem->>'suit' = p_suit
+  limit 1;
+
+  if v_card is null then
+    raise exception 'card not in hand';
+  end if;
+
+  select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_new_hand
+  from jsonb_array_elements(v_hand) elem
+  where elem->>'instanceId' <> p_instance_id;
+
+  select cards into v_deck from decks where game_id = p_game_id;
+
+  if v_deck is not null and jsonb_array_length(v_deck) > 0 then
+    v_drawn := v_deck->0;
+    select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_rest
+    from jsonb_array_elements(v_deck) with ordinality as t(elem, idx)
+    where idx > 1;
+    v_new_hand := v_new_hand || jsonb_build_array(v_drawn);
+  else
+    v_rest := '[]'::jsonb;
+  end if;
+
+  update hands set cards = v_new_hand where player_id = v_player_id;
+  update decks set cards = v_rest where game_id = p_game_id;
+  update games set deck_count = jsonb_array_length(v_rest) where id = p_game_id;
+
+  return v_new_hand;
+end;
+$$;
+
+-- Enable Realtime broadcasts (Postgres Changes) for these tables. Easy to
+-- forget: RLS alone doesn't make row changes stream to clients — the
+-- table also has to be added to the supabase_realtime publication.
+-- Wrapped in existence checks so this file can be re-run safely.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'games'
+  ) then
+    alter publication supabase_realtime add table games;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'players'
+  ) then
+    alter publication supabase_realtime add table players;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'hands'
+  ) then
+    alter publication supabase_realtime add table hands;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'moves'
+  ) then
+    alter publication supabase_realtime add table moves;
+  end if;
+end $$;
