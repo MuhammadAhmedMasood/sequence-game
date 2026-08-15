@@ -6,7 +6,7 @@ import Hand from "@/components/hand/Hand";
 import { dealHands } from "@/lib/game/deal";
 import { buildDeck, shuffle } from "@/lib/game/deck";
 import { isDeadCard } from "@/lib/game/deadCard";
-import { isOneEyedJack, isTwoEyedJack } from "@/lib/game/jacks";
+import { isJack } from "@/lib/game/jacks";
 import {
   applyMove,
   getPlayableSquares,
@@ -149,10 +149,15 @@ export default function Home() {
     [selectedTargets],
   );
 
+  // Jacks are excluded from the ambient hint highlight: a two-eyed jack
+  // matches every open square, so including it would flood the whole
+  // board green. Its own squares still show up in `selectedSquares` once
+  // it's explicitly selected — see the jack-click-through note below.
   const hintSquares = useMemo<Set<SquareIndex>>(() => {
     if (!hintsEnabled || !game || !currentPlayer) return new Set();
     const squares = new Set<SquareIndex>();
     for (const card of currentHand) {
+      if (isJack(card)) continue;
       const targets = getPlayableSquares(
         card,
         game.board,
@@ -277,11 +282,14 @@ export default function Home() {
       return;
     }
 
-    if (!hintsEnabled) return;
+    // Jacks are unambiguous — wild or anti-wild — so clicking one of their
+    // legal squares plays them even without pre-selecting, regardless of
+    // the Hints toggle. Non-jack cards only get this without-selecting
+    // convenience when Hints is on, since which card was "meant" can
+    // genuinely be ambiguous there.
+    const pool = hintsEnabled ? currentHand : currentHand.filter(isJack);
 
-    // Fall back to whichever hand card can legally act on this square —
-    // prefer an exact-match normal card over a wild/anti-wild jack.
-    const candidates = currentHand
+    const candidates = pool
       .map((card) => ({
         card,
         targets: getPlayableSquares(
@@ -294,10 +302,7 @@ export default function Home() {
       .filter((c) => c.targets?.squares.includes(index));
     if (candidates.length === 0) return;
 
-    const preferred =
-      candidates.find(
-        (c) => !isTwoEyedJack(c.card) && !isOneEyedJack(c.card),
-      ) ?? candidates[0];
+    const preferred = candidates.find((c) => !isJack(c.card)) ?? candidates[0];
     playMove(preferred.card, toAction(preferred.targets!.action, index));
   }
 
