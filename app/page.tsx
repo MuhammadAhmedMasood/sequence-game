@@ -313,15 +313,20 @@ export default function Home() {
 
   if (showOnlinePanel) {
     return (
-      <main className="flex h-dvh w-full flex-col items-center justify-center gap-4 bg-white p-4 dark:bg-zinc-950">
-        <h1 className="text-xl font-semibold tracking-tight">Sequence</h1>
+      <main className="flex h-dvh w-full flex-col items-center justify-center gap-6 bg-gradient-to-b from-zinc-50 to-white p-4 dark:from-zinc-950 dark:to-zinc-900">
+        <div className="flex flex-col items-center gap-1">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Sequence
+          </h1>
+          <p className="text-sm text-zinc-500">Play the classic board game online with friends.</p>
+        </div>
         <OnlinePlayPanel />
         <button
           type="button"
           onClick={() => setShowOnlinePanel(false)}
           className="text-sm text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          Back to local practice board
+          Practice locally instead
         </button>
       </main>
     );

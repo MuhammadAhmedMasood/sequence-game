@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { applyMove, validateMove } from "@/lib/game/moves";
 import type {
   CardInstance,
@@ -30,6 +30,13 @@ export interface UseGameResult {
   players: PlayerMeta[];
   myPlayerId: PlayerId | null;
   myHand: CardInstance[];
+  // True while a move is mid-flight (RPC + games update + moves log).
+  // The board round-trips over the network, so the local `game` object is
+  // briefly stale after a click — a second click in that window (a rushed
+  // double-click is the common case) would validate/apply against that
+  // stale state and could submit a bogus or duplicate move. Callers
+  // should ignore clicks while this is true.
+  isSubmitting: boolean;
   playMove: (card: CardInstance, action: MoveAction) => Promise<void>;
   swapDeadCard: (card: CardInstance) => Promise<void>;
 }
@@ -49,6 +56,13 @@ export function useGame(gameId: string | null): UseGameResult {
   const [players, setPlayers] = useState<PlayerMeta[]>([]);
   const [myPlayerId, setMyPlayerId] = useState<PlayerId | null>(null);
   const [myHand, setMyHand] = useState<CardInstance[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // A ref alongside the state: state updates are batched/async, and two
+  // clicks fired within the same tick (or before React re-renders) would
+  // both see the same stale `isSubmitting` value. The ref is set/read
+  // synchronously, so the *second* of two rapid clicks is reliably
+  // rejected even when it lands before a re-render.
+  const submittingRef = useRef(false);
 
   // Shared by the initial load and the reconnect catch-up below: fetches
   // fresh game/players/own-hand state from scratch. Needed on reconnect
@@ -172,6 +186,7 @@ export function useGame(gameId: string | null): UseGameResult {
 
   const playMove = useCallback(
     async (card: CardInstance, action: MoveAction) => {
+      if (submittingRef.current) return;
       if (!game || !myPlayerId) return;
       const me = players.find((p) => p.id === myPlayerId);
       if (!me) return;
@@ -188,57 +203,65 @@ export function useGame(gameId: string | null): UseGameResult {
         return;
       }
 
-      const applied = applyMove({
-        board: game.board_chips,
-        sequences: game.sequences,
-        sequenceUsage: game.sequence_usage,
-        currentSeatIndex: game.current_seat_index,
-        playerCount: players.length,
-        turnNumber: game.turn_number,
-        move,
-        actingChipColor: me.chipColor,
-      });
+      submittingRef.current = true;
+      setIsSubmitting(true);
+      try {
+        const applied = applyMove({
+          board: game.board_chips,
+          sequences: game.sequences,
+          sequenceUsage: game.sequence_usage,
+          currentSeatIndex: game.current_seat_index,
+          playerCount: players.length,
+          turnNumber: game.turn_number,
+          move,
+          actingChipColor: me.chipColor,
+        });
 
-      const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
-        p_game_id: game.id,
-        p_rank: card.rank,
-        p_suit: card.suit,
-        p_instance_id: card.instanceId,
-      });
-      if (rpcError) {
-        setError(rpcError.message);
-        return;
+        const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
+          p_game_id: game.id,
+          p_rank: card.rank,
+          p_suit: card.suit,
+          p_instance_id: card.instanceId,
+        });
+        if (rpcError) {
+          setError(rpcError.message);
+          return;
+        }
+
+        const { error: updateError } = await supabase
+          .from("games")
+          .update({
+            board_chips: applied.board,
+            sequences: applied.sequences,
+            sequence_usage: applied.sequenceUsage,
+            discard_top: applied.discardTop,
+            current_seat_index: applied.currentSeatIndex,
+            turn_number: applied.turnNumber,
+          })
+          .eq("id", game.id);
+        if (updateError) {
+          setError(updateError.message);
+          return;
+        }
+
+        await supabase.from("moves").insert({
+          game_id: game.id,
+          player_id: myPlayerId,
+          move_number: applied.turnNumber,
+          card,
+          action,
+        });
+      } finally {
+        submittingRef.current = false;
+        setIsSubmitting(false);
       }
-
-      const { error: updateError } = await supabase
-        .from("games")
-        .update({
-          board_chips: applied.board,
-          sequences: applied.sequences,
-          sequence_usage: applied.sequenceUsage,
-          discard_top: applied.discardTop,
-          current_seat_index: applied.currentSeatIndex,
-          turn_number: applied.turnNumber,
-        })
-        .eq("id", game.id);
-      if (updateError) {
-        setError(updateError.message);
-        return;
-      }
-
-      await supabase.from("moves").insert({
-        game_id: game.id,
-        player_id: myPlayerId,
-        move_number: applied.turnNumber,
-        card,
-        action,
-      });
     },
     [game, players, myPlayerId],
   );
 
   const swapDeadCard = useCallback(
     async (card: CardInstance) => {
+      if (submittingRef.current) return;
       if (!game || !myPlayerId) return;
       const me = players.find((p) => p.id === myPlayerId);
       if (!me) return;
@@ -254,16 +277,33 @@ export function useGame(gameId: string | null): UseGameResult {
         return;
       }
 
-      const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
-        p_game_id: game.id,
-        p_rank: card.rank,
-        p_suit: card.suit,
-        p_instance_id: card.instanceId,
-      });
-      if (rpcError) setError(rpcError.message);
+      submittingRef.current = true;
+      setIsSubmitting(true);
+      try {
+        const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
+          p_game_id: game.id,
+          p_rank: card.rank,
+          p_suit: card.suit,
+          p_instance_id: card.instanceId,
+        });
+        if (rpcError) setError(rpcError.message);
+      } finally {
+        submittingRef.current = false;
+        setIsSubmitting(false);
+      }
     },
     [game, players, myPlayerId],
   );
 
-  return { loading, error, game, players, myPlayerId, myHand, playMove, swapDeadCard };
+  return {
+    loading,
+    error,
+    game,
+    players,
+    myPlayerId,
+    myHand,
+    isSubmitting,
+    playMove,
+    swapDeadCard,
+  };
 }

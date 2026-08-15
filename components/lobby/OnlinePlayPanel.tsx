@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { GameMode } from "@/lib/game/types";
 import { createRoom, joinRoom } from "@/lib/supabase/queries";
+import ModeSelect from "./ModeSelect";
 
 // Not identity — just a convenience so a disconnected player who lands on
 // "/" instead of their room URL can find their way back. Actual
@@ -11,15 +12,12 @@ import { createRoom, joinRoom } from "@/lib/supabase/queries";
 // straight to /room/[code] already works without this.
 const LAST_ROOM_KEY = "sequence:lastRoomCode";
 
-// Milestone 3 scope: minimal but real create/join UI to prove the
-// Supabase wiring end-to-end. Milestone 4 replaces this with the real
-// landing page design.
 export default function OnlinePlayPanel() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<GameMode>("two-player");
   const [joinCode, setJoinCode] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"create" | "join" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastRoomCode, setLastRoomCode] = useState<string | null>(null);
 
@@ -37,7 +35,7 @@ export default function OnlinePlayPanel() {
       setError("Enter your name first.");
       return;
     }
-    setBusy(true);
+    setBusyAction("create");
     setError(null);
     try {
       const { roomCode } = await createRoom(mode, displayName.trim());
@@ -45,7 +43,7 @@ export default function OnlinePlayPanel() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create room");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -54,7 +52,7 @@ export default function OnlinePlayPanel() {
       setError("Enter your name and a room code.");
       return;
     }
-    setBusy(true);
+    setBusyAction("join");
     setError(null);
     try {
       const { roomCode } = await joinRoom(joinCode.trim(), displayName.trim());
@@ -62,70 +60,85 @@ export default function OnlinePlayPanel() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to join room");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
-  return (
-    <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-6 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-      <p className="text-base font-semibold text-zinc-700 dark:text-zinc-200">
-        Play online
-      </p>
+  const inputClasses =
+    "rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-zinc-600 dark:bg-zinc-800 dark:focus:ring-blue-950";
 
+  return (
+    <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
       {lastRoomCode ? (
         <button
           type="button"
           onClick={() => goToRoom(lastRoomCode)}
-          className="rounded border border-blue-500 px-2 py-1 text-left font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+          className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
         >
-          Rejoin room {lastRoomCode}
+          <span>Rejoin room {lastRoomCode}</span>
+          <span aria-hidden>→</span>
         </button>
       ) : null}
 
-      <input
-        type="text"
-        placeholder="Your name"
-        value={displayName}
-        onChange={(e) => setDisplayName(e.target.value)}
-        className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800"
-      />
-      <div className="flex gap-2">
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as GameMode)}
-          className="flex-1 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800"
-        >
-          <option value="two-player">2 Player</option>
-          <option value="three-player">3 Player</option>
-          <option value="two-team">2 Teams of 2</option>
-        </select>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={handleCreate}
-          className="rounded bg-blue-600 px-3 py-1 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          Create room
-        </button>
-      </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="display-name" className="text-xs font-semibold text-zinc-500">
+          Your name
+        </label>
         <input
+          id="display-name"
           type="text"
-          placeholder="Room code"
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value)}
-          className="flex-1 rounded border border-zinc-300 px-2 py-1 uppercase dark:border-zinc-600 dark:bg-zinc-800"
+          placeholder="e.g. Alex"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className={inputClasses}
         />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold text-zinc-500">New game</p>
+        <ModeSelect value={mode} onChange={setMode} />
         <button
           type="button"
-          disabled={busy}
-          onClick={handleJoin}
-          className="rounded bg-zinc-700 px-3 py-1 font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          disabled={busyAction !== null}
+          onClick={handleCreate}
+          className="mt-1 rounded-lg bg-blue-600 py-2.5 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
         >
-          Join room
+          {busyAction === "create" ? "Creating…" : "Create room"}
         </button>
       </div>
-      {error ? <p className="text-red-600">{error}</p> : null}
+
+      <div className="flex items-center gap-3 text-xs font-medium text-zinc-400">
+        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700" />
+        or
+        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700" />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold text-zinc-500">Have a code?</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="ROOM CODE"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+            className={`flex-1 font-mono uppercase tracking-widest ${inputClasses}`}
+          />
+          <button
+            type="button"
+            disabled={busyAction !== null}
+            onClick={handleJoin}
+            className="shrink-0 rounded-lg bg-zinc-800 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:opacity-50 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+          >
+            {busyAction === "join" ? "Joining…" : "Join"}
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
