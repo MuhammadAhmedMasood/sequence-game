@@ -67,8 +67,10 @@ export default function OnlinePlayPanel() {
   }
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-2 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
-      <p className="font-semibold text-zinc-700 dark:text-zinc-200">Play online</p>
+    <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-6 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+      <p className="text-base font-semibold text-zinc-700 dark:text-zinc-200">
+        Play online
+      </p>
 
       {lastRoomCode ? (
         <button

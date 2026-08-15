@@ -308,6 +308,22 @@ export default function Home() {
     playMove(preferred.card, toAction(preferred.targets!.action, index));
   }
 
+  if (showOnlinePanel) {
+    return (
+      <main className="flex h-dvh w-full flex-col items-center justify-center gap-4 bg-white p-4 dark:bg-zinc-950">
+        <h1 className="text-xl font-semibold tracking-tight">Sequence</h1>
+        <OnlinePlayPanel />
+        <button
+          type="button"
+          onClick={() => setShowOnlinePanel(false)}
+          className="text-sm text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
+        >
+          Back to local practice board
+        </button>
+      </main>
+    );
+  }
+
   return (
     <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden p-2 sm:p-4">
       <div className="flex w-full max-w-4xl shrink-0 flex-wrap items-center justify-between gap-2">
@@ -411,17 +427,6 @@ export default function Home() {
           }
         />
       </div>
-
-      {showOnlinePanel ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowOnlinePanel(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-            <OnlinePlayPanel />
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }
