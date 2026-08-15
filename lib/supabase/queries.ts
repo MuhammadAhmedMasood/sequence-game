@@ -174,7 +174,19 @@ export async function joinRoom(roomCode: string, displayName: string): Promise<J
   throw new Error(lastError instanceof Error ? lastError.message : "Could not claim a seat");
 }
 
-export async function startGame(gameId: string): Promise<void> {
+// hintsEnabled is a whole-game setting the host picks once, here — every
+// player sees the same value for the rest of the game (see
+// RoomClient.tsx). The update is only reachable by the host in the first
+// place: the "update on your turn" RLS policy requires seat_index to
+// match games.current_seat_index, which defaults to 0 (the host's seat)
+// until deal_game changes it.
+export async function startGame(gameId: string, hintsEnabled: boolean): Promise<void> {
+  const { error: settingError } = await supabase
+    .from("games")
+    .update({ hints_enabled: hintsEnabled })
+    .eq("id", gameId);
+  if (settingError) throw new Error(settingError.message);
+
   const { error } = await supabase.rpc("deal_game", { p_game_id: gameId });
   if (error) throw new Error(error.message);
 }

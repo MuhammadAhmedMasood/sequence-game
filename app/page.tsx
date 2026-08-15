@@ -123,7 +123,10 @@ export default function Home() {
     null,
   );
   const [hintsEnabled, setHintsEnabled] = useState(false);
-  const [showOnlinePanel, setShowOnlinePanel] = useState(false);
+  // Defaults to the online panel: landing on this page shouldn't drop you
+  // straight into a playable local board before you've even chosen
+  // online vs. local — see the "Practice locally instead" link below.
+  const [showOnlinePanel, setShowOnlinePanel] = useState(true);
 
   useEffect(() => {
     setGame(createLocalGame("two-player"));

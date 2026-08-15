@@ -29,6 +29,9 @@ export interface GameRow {
   current_seat_index: number;
   turn_number: number;
   winner: ChipColor | null;
+  // Host-set at start time, applies to every player — not a per-client
+  // preference (see RoomClient.tsx).
+  hints_enabled: boolean;
   created_at: string;
 }
 

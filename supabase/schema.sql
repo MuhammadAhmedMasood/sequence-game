@@ -31,8 +31,15 @@ create table if not exists games (
   current_seat_index int not null default 0,
   turn_number int not null default 0,
   winner text,
+  -- A host-set, whole-game setting (not a per-client preference): the
+  -- host chooses it once before starting, and it applies to every player.
+  hints_enabled boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+-- Idempotent on an already-existing table (re-running this file against
+-- a project that predates this column just adds it).
+alter table games add column if not exists hints_enabled boolean not null default false;
 
 create table if not exists players (
   id uuid primary key default gen_random_uuid(),
