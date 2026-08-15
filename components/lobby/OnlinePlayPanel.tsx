@@ -1,9 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { GameMode } from "@/lib/game/types";
 import { createRoom, joinRoom } from "@/lib/supabase/queries";
+
+// Not identity — just a convenience so a disconnected player who lands on
+// "/" instead of their room URL can find their way back. Actual
+// reconnection is identity-based (see lib/supabase/client.ts): navigating
+// straight to /room/[code] already works without this.
+const LAST_ROOM_KEY = "sequence:lastRoomCode";
 
 // Milestone 3 scope: minimal but real create/join UI to prove the
 // Supabase wiring end-to-end. Milestone 4 replaces this with the real
@@ -15,6 +21,16 @@ export default function OnlinePlayPanel() {
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastRoomCode, setLastRoomCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLastRoomCode(localStorage.getItem(LAST_ROOM_KEY));
+  }, []);
+
+  function goToRoom(roomCode: string) {
+    localStorage.setItem(LAST_ROOM_KEY, roomCode);
+    router.push(`/room/${roomCode}`);
+  }
 
   async function handleCreate() {
     if (!displayName.trim()) {
@@ -25,7 +41,7 @@ export default function OnlinePlayPanel() {
     setError(null);
     try {
       const { roomCode } = await createRoom(mode, displayName.trim());
-      router.push(`/room/${roomCode}`);
+      goToRoom(roomCode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create room");
     } finally {
@@ -42,7 +58,7 @@ export default function OnlinePlayPanel() {
     setError(null);
     try {
       const { roomCode } = await joinRoom(joinCode.trim(), displayName.trim());
-      router.push(`/room/${roomCode}`);
+      goToRoom(roomCode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to join room");
     } finally {
@@ -53,6 +69,17 @@ export default function OnlinePlayPanel() {
   return (
     <div className="flex w-full max-w-md flex-col gap-2 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
       <p className="font-semibold text-zinc-700 dark:text-zinc-200">Play online</p>
+
+      {lastRoomCode ? (
+        <button
+          type="button"
+          onClick={() => goToRoom(lastRoomCode)}
+          className="rounded border border-blue-500 px-2 py-1 text-left font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+        >
+          Rejoin room {lastRoomCode}
+        </button>
+      ) : null}
+
       <input
         type="text"
         placeholder="Your name"

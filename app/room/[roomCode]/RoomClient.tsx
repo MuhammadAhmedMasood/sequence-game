@@ -47,6 +47,9 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
           return;
         }
         setGameId(data.id);
+        // So the landing page can offer "rejoin" even if this tab was
+        // opened via a shared link rather than the create/join panel.
+        localStorage.setItem("sequence:lastRoomCode", roomCode.toUpperCase());
       });
     return () => {
       cancelled = true;

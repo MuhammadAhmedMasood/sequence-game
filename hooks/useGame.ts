@@ -50,49 +50,70 @@ export function useGame(gameId: string | null): UseGameResult {
   const [myPlayerId, setMyPlayerId] = useState<PlayerId | null>(null);
   const [myHand, setMyHand] = useState<CardInstance[]>([]);
 
+  // Shared by the initial load and the reconnect catch-up below: fetches
+  // fresh game/players/own-hand state from scratch. Needed on reconnect
+  // because Postgres Changes has no replay — events that happened while a
+  // tab was backgrounded or offline are simply missed, so the client has
+  // to explicitly re-sync rather than trust the delta stream alone.
+  const refetch = useCallback(async () => {
+    if (!gameId) return;
+    try {
+      const authUserId = await ensureAuthUserId();
+
+      const [gameResult, playersResult] = await Promise.all([
+        supabase.from("games").select("*").eq("id", gameId).single(),
+        supabase.from("players").select("*").eq("game_id", gameId).order("seat_index"),
+      ]);
+      if (gameResult.error) throw gameResult.error;
+      if (playersResult.error) throw playersResult.error;
+
+      const playerRows = playersResult.data ?? [];
+      setGame(gameResult.data);
+      setPlayers(playerRows.map(toPlayerMeta));
+
+      const me = playerRows.find((p) => p.auth_user_id === authUserId);
+      if (me) {
+        setMyPlayerId(me.id);
+        const { data: handRow } = await supabase
+          .from("hands")
+          .select("cards")
+          .eq("player_id", me.id)
+          .maybeSingle();
+        setMyHand(handRow?.cards ?? []);
+      }
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load game");
+    }
+  }, [gameId]);
+
   useEffect(() => {
     if (!gameId) return;
     let cancelled = false;
-
-    async function load() {
-      try {
-        const authUserId = await ensureAuthUserId();
-        if (cancelled) return;
-
-        const [gameResult, playersResult] = await Promise.all([
-          supabase.from("games").select("*").eq("id", gameId).single(),
-          supabase.from("players").select("*").eq("game_id", gameId).order("seat_index"),
-        ]);
-        if (gameResult.error) throw gameResult.error;
-        if (playersResult.error) throw playersResult.error;
-        if (cancelled) return;
-
-        const playerRows = playersResult.data ?? [];
-        setGame(gameResult.data);
-        setPlayers(playerRows.map(toPlayerMeta));
-
-        const me = playerRows.find((p) => p.auth_user_id === authUserId);
-        if (me) {
-          setMyPlayerId(me.id);
-          const { data: handRow } = await supabase
-            .from("hands")
-            .select("cards")
-            .eq("player_id", me.id)
-            .maybeSingle();
-          if (!cancelled) setMyHand(handRow?.cards ?? []);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load game");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
+    setLoading(true);
+    refetch().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [gameId]);
+  }, [gameId, refetch]);
+
+  // A dropped connection (bad wifi, laptop sleep, backgrounded tab) means
+  // missed Realtime events — catch up by refetching whenever the tab
+  // becomes visible again or the browser reports it's back online.
+  useEffect(() => {
+    if (!gameId) return;
+    function handleReconnectSignal() {
+      if (document.visibilityState === "visible") refetch();
+    }
+    window.addEventListener("online", handleReconnectSignal);
+    document.addEventListener("visibilitychange", handleReconnectSignal);
+    return () => {
+      window.removeEventListener("online", handleReconnectSignal);
+      document.removeEventListener("visibilitychange", handleReconnectSignal);
+    };
+  }, [gameId, refetch]);
 
   useEffect(() => {
     if (!gameId) return;

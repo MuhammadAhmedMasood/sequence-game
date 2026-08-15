@@ -110,6 +110,22 @@ export async function joinRoom(roomCode: string, displayName: string): Promise<J
   if (gameError || !game) {
     throw new Error("Room not found — check the code and try again.");
   }
+
+  // Reconnecting: this identity already has a seat here (e.g. they closed
+  // the tab and came back, or typed the code again instead of using
+  // browser history) — hand them back their existing seat rather than
+  // trying to claim a new one, regardless of whether the game already
+  // started.
+  const { data: existingPlayer } = await supabase
+    .from("players")
+    .select("id")
+    .eq("game_id", game.id)
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+  if (existingPlayer) {
+    return { gameId: game.id, roomCode: game.room_code, playerId: existingPlayer.id };
+  }
+
   if (game.status !== "lobby") {
     throw new Error("That game has already started.");
   }
