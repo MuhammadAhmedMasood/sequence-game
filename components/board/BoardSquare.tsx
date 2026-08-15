@@ -36,21 +36,26 @@ export default function BoardSquare({
 }: BoardSquareProps) {
   const isRed = square.kind === "card" && RED_SUITS.has(square.card.suit);
 
+  const bgClass =
+    square.kind === "corner"
+      ? "bg-amber-100 dark:bg-amber-900/40"
+      : selected
+        ? "bg-blue-200 dark:bg-blue-800/60"
+        : hinted
+          ? "bg-emerald-100 dark:bg-emerald-800/40"
+          : "bg-white dark:bg-zinc-900";
+
   const ringClass = selected
     ? "ring-2 ring-inset ring-blue-500"
     : hinted
-      ? "ring-2 ring-inset ring-emerald-400"
+      ? "ring-1 ring-inset ring-emerald-400"
       : "";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex aspect-square items-center justify-center border border-zinc-200 text-xs leading-none sm:text-sm md:text-base dark:border-zinc-700 ${
-        square.kind === "corner"
-          ? "bg-amber-100 dark:bg-amber-900/40"
-          : "bg-white dark:bg-zinc-900"
-      } ${ringClass}`}
+      className={`relative flex aspect-square items-center justify-center border border-zinc-200 text-xs leading-none sm:text-sm md:text-base dark:border-zinc-700 ${bgClass} ${ringClass}`}
     >
       {square.kind === "corner" ? (
         <span className="text-amber-600 dark:text-amber-300">★</span>
