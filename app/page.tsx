@@ -364,13 +364,31 @@ export default function Home() {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center gap-4">
         <Board
           chips={activeGame.board}
           selectedSquares={selectedSquares}
           hintSquares={hintSquares}
           onSquareClick={handleSquareClick}
         />
+
+        <div className="hidden w-44 shrink-0 flex-col gap-3 self-center rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600 shadow-sm lg:flex dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">
+            Jack cards
+          </p>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[0.65rem] font-bold text-white">
+              W
+            </span>
+            <span>Wild — place a chip on any open square</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-[0.65rem] font-bold text-white">
+              R
+            </span>
+            <span>Anti-wild — remove one opponent chip</span>
+          </div>
+        </div>
       </div>
 
       <div className="w-full max-w-4xl shrink-0">
