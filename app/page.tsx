@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Board from "@/components/board/Board";
 import Hand from "@/components/hand/Hand";
-import { getSquaresForCard } from "@/lib/game/board-layout";
+import { getBoardSquare, getSquaresForCard } from "@/lib/game/board-layout";
 import type { BoardChips, CardInstance, SquareIndex } from "@/lib/game/types";
 
 // A fixed starting hand for the Milestone 1 local demo. instanceIds are
@@ -26,23 +26,54 @@ export default function Home() {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
     null,
   );
+  const [hintsEnabled, setHintsEnabled] = useState(false);
 
   const selectedCard = hand.find((c) => c.instanceId === selectedInstanceId);
 
-  const highlightedSquares = useMemo<Set<SquareIndex>>(() => {
+  // Strong highlight: the two squares for whichever card is explicitly
+  // selected in the hand.
+  const selectedSquares = useMemo<Set<SquareIndex>>(() => {
     if (!selectedCard) return new Set();
     return new Set(
       getSquaresForCard(selectedCard).filter((index) => !chips[index]),
     );
   }, [selectedCard, chips]);
 
+  // Weak highlight: with hints on, every open square that matches *any*
+  // card currently in hand — lets the player survey all their options
+  // before committing to a card.
+  const hintSquares = useMemo<Set<SquareIndex>>(() => {
+    if (!hintsEnabled) return new Set();
+    const squares = new Set<SquareIndex>();
+    for (const card of hand) {
+      for (const index of getSquaresForCard(card)) {
+        if (!chips[index]) squares.add(index);
+      }
+    }
+    return squares;
+  }, [hintsEnabled, hand, chips]);
+
   function handleSquareClick(index: SquareIndex) {
-    if (!selectedCard || !highlightedSquares.has(index)) return;
+    if (chips[index]) return;
+
+    const square = getBoardSquare(index);
+    if (square.kind !== "card") return;
+
+    // Prefer the explicitly selected card if this square is one of its two
+    // squares; otherwise, with hints on, fall back to whichever hand card
+    // matches this square's printed card so a hint can be played directly.
+    let cardToPlay = selectedCard;
+    if (!cardToPlay || !selectedSquares.has(index)) {
+      if (!hintsEnabled) return;
+      cardToPlay = hand.find(
+        (c) => c.rank === square.card.rank && c.suit === square.card.suit,
+      );
+    }
+    const card = cardToPlay;
+    if (!card) return;
 
     setChips((prev) => ({ ...prev, [index]: "red" }));
-    setHand((prev) =>
-      prev.filter((c) => c.instanceId !== selectedCard.instanceId),
-    );
+    setHand((prev) => prev.filter((c) => c.instanceId !== card.instanceId));
     setSelectedInstanceId(null);
   }
 
@@ -56,9 +87,20 @@ export default function Home() {
         </p>
       </div>
 
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+        <input
+          type="checkbox"
+          checked={hintsEnabled}
+          onChange={(e) => setHintsEnabled(e.target.checked)}
+          className="h-4 w-4 accent-emerald-500"
+        />
+        Hints (highlight every playable square for your whole hand)
+      </label>
+
       <Board
         chips={chips}
-        highlightedSquares={highlightedSquares}
+        selectedSquares={selectedSquares}
+        hintSquares={hintSquares}
         onSquareClick={handleSquareClick}
       />
 

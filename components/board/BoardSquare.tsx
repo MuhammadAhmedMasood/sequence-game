@@ -18,27 +18,39 @@ const CHIP_CLASSES: Record<ChipColor, string> = {
 interface BoardSquareProps {
   square: BoardSquareDef;
   chip: ChipColor | undefined;
-  highlighted: boolean;
+  // Strong highlight: this square matches the card the player has explicitly
+  // selected in their hand.
+  selected: boolean;
+  // Weak highlight: hints are on and this square matches *some* card in the
+  // player's hand (not necessarily the selected one).
+  hinted: boolean;
   onClick: () => void;
 }
 
 export default function BoardSquare({
   square,
   chip,
-  highlighted,
+  selected,
+  hinted,
   onClick,
 }: BoardSquareProps) {
   const isRed = square.kind === "card" && RED_SUITS.has(square.card.suit);
+
+  const ringClass = selected
+    ? "ring-2 ring-inset ring-blue-500"
+    : hinted
+      ? "ring-2 ring-inset ring-emerald-400"
+      : "";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex aspect-square items-center justify-center border border-zinc-200 text-[0.55rem] leading-none sm:text-xs dark:border-zinc-700 ${
+      className={`relative flex aspect-square items-center justify-center border border-zinc-200 text-xs leading-none sm:text-sm md:text-base dark:border-zinc-700 ${
         square.kind === "corner"
           ? "bg-amber-100 dark:bg-amber-900/40"
           : "bg-white dark:bg-zinc-900"
-      } ${highlighted ? "ring-2 ring-inset ring-blue-500" : ""}`}
+      } ${ringClass}`}
     >
       {square.kind === "corner" ? (
         <span className="text-amber-600 dark:text-amber-300">★</span>
