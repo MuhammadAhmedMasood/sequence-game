@@ -55,7 +55,7 @@ export default function BoardSquare({
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex aspect-square items-center justify-center border border-zinc-200 text-xs leading-none sm:text-sm md:text-base dark:border-zinc-700 ${bgClass} ${ringClass}`}
+      className={`relative flex h-full w-full items-center justify-center overflow-hidden border border-zinc-200 text-xs leading-none sm:text-sm md:text-base dark:border-zinc-700 ${bgClass} ${ringClass}`}
     >
       {square.kind === "corner" ? (
         <span className="text-amber-600 dark:text-amber-300">★</span>

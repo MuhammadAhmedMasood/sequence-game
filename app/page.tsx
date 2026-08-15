@@ -78,41 +78,42 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-6 p-4 sm:p-8">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Sequence</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Click a card, then click one of its two highlighted squares to
-          place a chip.
-        </p>
+    <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden p-2 sm:p-4">
+      <div className="flex w-full max-w-4xl shrink-0 items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
+          Sequence
+        </h1>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600 sm:text-sm dark:text-zinc-300">
+          <input
+            type="checkbox"
+            checked={hintsEnabled}
+            onChange={(e) => setHintsEnabled(e.target.checked)}
+            className="h-4 w-4 accent-emerald-500"
+          />
+          Hints
+        </label>
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-        <input
-          type="checkbox"
-          checked={hintsEnabled}
-          onChange={(e) => setHintsEnabled(e.target.checked)}
-          className="h-4 w-4 accent-emerald-500"
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <Board
+          chips={chips}
+          selectedSquares={selectedSquares}
+          hintSquares={hintSquares}
+          onSquareClick={handleSquareClick}
         />
-        Hints (highlight every playable square for your whole hand)
-      </label>
+      </div>
 
-      <Board
-        chips={chips}
-        selectedSquares={selectedSquares}
-        hintSquares={hintSquares}
-        onSquareClick={handleSquareClick}
-      />
-
-      <Hand
-        cards={hand}
-        selectedInstanceId={selectedInstanceId ?? null}
-        onSelect={(instanceId) =>
-          setSelectedInstanceId((current) =>
-            current === instanceId ? null : instanceId,
-          )
-        }
-      />
+      <div className="w-full max-w-4xl shrink-0">
+        <Hand
+          cards={hand}
+          selectedInstanceId={selectedInstanceId ?? null}
+          onSelect={(instanceId) =>
+            setSelectedInstanceId((current) =>
+              current === instanceId ? null : instanceId,
+            )
+          }
+        />
+      </div>
     </main>
   );
 }

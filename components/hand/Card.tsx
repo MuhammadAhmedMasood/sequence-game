@@ -23,14 +23,16 @@ export default function Card({ card, selected = false, onClick }: CardProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-24 w-16 shrink-0 flex-col items-center justify-center rounded-lg border-2 bg-white font-semibold shadow-sm transition-transform hover:-translate-y-1 ${
+      className={`flex h-14 w-10 shrink-0 flex-col items-center justify-center rounded-lg border-2 bg-white font-semibold shadow-sm transition-transform hover:-translate-y-1 sm:h-20 sm:w-14 ${
         selected
           ? "border-blue-500 ring-2 ring-blue-300"
           : "border-zinc-300"
       } ${isRed ? "text-red-600" : "text-zinc-900"}`}
     >
-      <span className="text-lg leading-none">{card.rank}</span>
-      <span className="text-2xl leading-none">{SUIT_SYMBOLS[card.suit]}</span>
+      <span className="text-sm leading-none sm:text-lg">{card.rank}</span>
+      <span className="text-lg leading-none sm:text-2xl">
+        {SUIT_SYMBOLS[card.suit]}
+      </span>
     </button>
   );
 }

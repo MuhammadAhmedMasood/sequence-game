@@ -9,7 +9,7 @@ interface HandProps {
 
 export default function Hand({ cards, selectedInstanceId, onSelect }: HandProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto p-2">
+    <div className="flex justify-center gap-2 overflow-x-auto py-1">
       {cards.map((card) => (
         <Card
           key={card.instanceId}

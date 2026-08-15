@@ -16,7 +16,7 @@ export default function Board({
   onSquareClick,
 }: BoardProps) {
   return (
-    <div className="grid w-full max-w-4xl grid-cols-10 gap-0.5 rounded-lg bg-zinc-300 p-1 dark:bg-zinc-700">
+    <div className="grid h-full w-auto max-w-full aspect-square grid-cols-10 grid-rows-10 gap-0.5 rounded-lg bg-zinc-300 p-1 dark:bg-zinc-700">
       {BOARD_LAYOUT.map((square) => (
         <BoardSquare
           key={square.index}
