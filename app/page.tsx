@@ -128,9 +128,17 @@ export default function Home() {
   // online vs. local — see the "Practice locally instead" link below.
   const [showOnlinePanel, setShowOnlinePanel] = useState(true);
 
+  // Lazy — only creates the local game once the user actually leaves the
+  // online panel. Creating it unconditionally on mount used to block the
+  // online panel behind an "if (!game) return Setting up…" check below,
+  // which was harmless on desktop (the effect resolves before the user
+  // notices) but on some mobile browsers left the page stuck on "Setting
+  // up the game…" indefinitely instead of ever reaching the online panel.
   useEffect(() => {
-    setGame(createLocalGame("two-player"));
-  }, []);
+    if (!showOnlinePanel && !game) {
+      setGame(createLocalGame("two-player"));
+    }
+  }, [showOnlinePanel, game]);
 
   const currentPlayer = game ? game.players[game.currentSeatIndex] : null;
   const currentHand =
@@ -183,6 +191,53 @@ export default function Home() {
     if (game.mode === "two-team") return `Team ${winners[0]?.team}`;
     return winners[0]?.displayName ?? "Someone";
   }, [game]);
+
+  // Checked before the local-game-readiness guard below: the online panel
+  // has no dependency on `game`/`currentPlayer` at all, so it must never
+  // wait on local game setup to render. (It used to be checked after that
+  // guard, which meant the panel was — harmlessly on desktop, but
+  // sometimes never on mobile — blocked behind "Setting up the game…"
+  // until the local hot-seat game finished initializing.)
+  if (showOnlinePanel) {
+    return (
+      <main className="relative flex min-h-dvh w-full flex-col items-center justify-center gap-8 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 py-10 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-300/30 blur-3xl dark:bg-indigo-700/20"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-purple-300/30 blur-3xl dark:bg-purple-700/20"
+        />
+
+        <div className="relative flex flex-col items-center gap-3 text-center">
+          <div className="flex items-center gap-2">
+            {["bg-red-500", "bg-blue-500", "bg-green-500"].map((c) => (
+              <span key={c} className={`h-3.5 w-3.5 rounded-full shadow-sm ${c}`} />
+            ))}
+          </div>
+          <h1 className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent sm:text-5xl">
+            Sequence
+          </h1>
+          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+            Play the classic board game online with friends — no downloads, no accounts.
+          </p>
+        </div>
+
+        <div className="relative w-full max-w-md">
+          <OnlinePlayPanel />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowOnlinePanel(false)}
+          className="relative text-sm text-zinc-500 underline underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-400"
+        >
+          Practice locally instead
+        </button>
+      </main>
+    );
+  }
 
   if (!game || !currentPlayer) {
     return (
@@ -309,47 +364,6 @@ export default function Home() {
 
     const preferred = candidates.find((c) => !isJack(c.card)) ?? candidates[0];
     playMove(preferred.card, toAction(preferred.targets!.action, index));
-  }
-
-  if (showOnlinePanel) {
-    return (
-      <main className="relative flex min-h-dvh w-full flex-col items-center justify-center gap-8 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 py-10 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-300/30 blur-3xl dark:bg-indigo-700/20"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-purple-300/30 blur-3xl dark:bg-purple-700/20"
-        />
-
-        <div className="relative flex flex-col items-center gap-3 text-center">
-          <div className="flex items-center gap-2">
-            {["bg-red-500", "bg-blue-500", "bg-green-500"].map((c) => (
-              <span key={c} className={`h-3.5 w-3.5 rounded-full shadow-sm ${c}`} />
-            ))}
-          </div>
-          <h1 className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent sm:text-5xl">
-            Sequence
-          </h1>
-          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
-            Play the classic board game online with friends — no downloads, no accounts.
-          </p>
-        </div>
-
-        <div className="relative w-full max-w-md">
-          <OnlinePlayPanel />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setShowOnlinePanel(false)}
-          className="relative text-sm text-zinc-500 underline underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-400"
-        >
-          Practice locally instead
-        </button>
-      </main>
-    );
   }
 
   return (

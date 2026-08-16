@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Board from "@/components/board/Board";
+import Scoreboard from "@/components/game/Scoreboard";
 import Hand from "@/components/hand/Hand";
 import WaitingRoom from "@/components/lobby/WaitingRoom";
 import { useGame } from "@/hooks/useGame";
@@ -9,13 +10,25 @@ import { playTurnChime } from "@/lib/audio/chime";
 import { isDeadCard } from "@/lib/game/deadCard";
 import { isJack } from "@/lib/game/jacks";
 import { getPlayableSquares } from "@/lib/game/moves";
-import type { CardInstance, MoveAction, SquareIndex, Team } from "@/lib/game/types";
+import type { CardInstance, ChipColor, MoveAction, SquareIndex, Team } from "@/lib/game/types";
 import { supabase } from "@/lib/supabase/client";
 import { setTeam, startGame } from "@/lib/supabase/queries";
 
 interface RoomClientProps {
   roomCode: string;
 }
+
+const CHIP_DOT_CLASSES: Record<ChipColor, string> = {
+  red: "bg-red-500",
+  blue: "bg-blue-500",
+  green: "bg-green-500",
+};
+
+const CHIP_LABELS: Record<ChipColor, string> = {
+  red: "Red",
+  blue: "Blue",
+  green: "Green",
+};
 
 export default function RoomClient({ roomCode }: RoomClientProps) {
   const [gameId, setGameId] = useState<string | null>(null);
@@ -212,9 +225,17 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   return (
     <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-2 sm:p-4 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
       <div className="flex w-full max-w-4xl shrink-0 items-center justify-between gap-2">
-        <h1 className="text-base font-semibold tracking-tight text-zinc-800 sm:text-lg dark:text-zinc-100">
-          Room <span className="font-mono">{game.room_code}</span>
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-semibold tracking-tight text-zinc-800 sm:text-lg dark:text-zinc-100">
+            Room <span className="font-mono">{game.room_code}</span>
+          </h1>
+          {myPlayer ? (
+            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${CHIP_DOT_CLASSES[myPlayer.chipColor]}`} />
+              You: {CHIP_LABELS[myPlayer.chipColor]}
+            </span>
+          ) : null}
+        </div>
         {game.winner ? (
           <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Game over</span>
         ) : isMyTurn ? (
@@ -226,6 +247,17 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
             {turnLabel}
           </span>
         )}
+      </div>
+
+      <div className="w-full max-w-4xl shrink-0 lg:hidden">
+        <Scoreboard
+          compact
+          mode={game.mode}
+          players={players}
+          sequences={game.sequences}
+          sequencesToWin={game.sequences_to_win}
+          myPlayerId={myPlayerId}
+        />
       </div>
 
       {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
@@ -256,19 +288,29 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
           onSquareClick={handleSquareClick}
         />
 
-        <div className="hidden w-44 shrink-0 flex-col gap-3 self-center rounded-xl border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 shadow-sm backdrop-blur-sm lg:flex dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
-          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Jack cards</p>
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[0.65rem] font-bold text-white">
-              W
-            </span>
-            <span>Wild — place a chip on any open square</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-[0.65rem] font-bold text-white">
-              R
-            </span>
-            <span>Anti-wild — remove one opponent chip</span>
+        <div className="hidden w-44 shrink-0 flex-col gap-4 self-center lg:flex">
+          <Scoreboard
+            mode={game.mode}
+            players={players}
+            sequences={game.sequences}
+            sequencesToWin={game.sequences_to_win}
+            myPlayerId={myPlayerId}
+          />
+
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 shadow-sm backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Jack cards</p>
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[0.65rem] font-bold text-white">
+                W
+              </span>
+              <span>Wild — place a chip on any open square</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-[0.65rem] font-bold text-white">
+                R
+              </span>
+              <span>Anti-wild — remove one opponent chip</span>
+            </div>
           </div>
         </div>
       </div>

@@ -99,9 +99,13 @@ drop policy if exists "join as self" on players;
 create policy "join as self" on players for insert
   with check (auth_user_id = auth.uid());
 
--- Lets a player change their own team (2v2 team picker) only before the
--- game starts — seat_index/turn order gets finalized by deal_game once
--- it does, so team changes afterward would silently desync from it.
+-- Lets a player drag-and-drop their own name between team columns in the
+-- 2v2 lobby, only before the game starts — seat_index/turn order gets
+-- finalized by deal_game once it does, so team changes afterward would
+-- silently desync from it. Deliberately self-only (not "any seated player
+-- can move any player"): that would require every other row to be
+-- writable by everyone in the lobby, a much bigger blast radius for one
+-- UI convenience.
 drop policy if exists "update own player before start" on players;
 create policy "update own player before start" on players for update
   using (

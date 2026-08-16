@@ -221,6 +221,11 @@ export function useGame(gameId: string | null): UseGameResult {
 
       submittingRef.current = true;
       setIsSubmitting(true);
+      // Snapshot for rollback: the optimistic update below is applied
+      // before any network call resolves, so a failed RPC/update needs to
+      // restore exactly what was on screen beforehand.
+      const previousGame = game;
+      const previousHand = myHand;
       try {
         const applied = applyMove({
           board: game.board_chips,
@@ -233,6 +238,27 @@ export function useGame(gameId: string | null): UseGameResult {
           actingChipColor: me.chipColor,
         });
 
+        // Optimistic update: apply the chip placement and turn advance
+        // locally right away, instead of waiting on the RPC + games UPDATE
+        // + the Realtime event that echoes it back. Without this, the
+        // chip and the "Your turn!" banner only changed once that full
+        // round trip landed, which read as the click having done nothing
+        // (or the game having frozen) on any connection with real latency.
+        setGame((prev) =>
+          prev
+            ? {
+                ...prev,
+                board_chips: applied.board,
+                sequences: applied.sequences,
+                sequence_usage: applied.sequenceUsage,
+                discard_top: applied.discardTop,
+                current_seat_index: applied.currentSeatIndex,
+                turn_number: applied.turnNumber,
+              }
+            : prev,
+        );
+        setMyHand((prev) => prev.filter((c) => c.instanceId !== card.instanceId));
+
         const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
           p_game_id: game.id,
           p_rank: card.rank,
@@ -241,6 +267,8 @@ export function useGame(gameId: string | null): UseGameResult {
         });
         if (rpcError) {
           setError(rpcError.message);
+          setGame(previousGame);
+          setMyHand(previousHand);
           return;
         }
 
@@ -257,6 +285,8 @@ export function useGame(gameId: string | null): UseGameResult {
           .eq("id", game.id);
         if (updateError) {
           setError(updateError.message);
+          setGame(previousGame);
+          setMyHand(previousHand);
           return;
         }
 
@@ -272,7 +302,7 @@ export function useGame(gameId: string | null): UseGameResult {
         setIsSubmitting(false);
       }
     },
-    [game, players, myPlayerId],
+    [game, players, myPlayerId, myHand],
   );
 
   const swapDeadCard = useCallback(
@@ -295,6 +325,11 @@ export function useGame(gameId: string | null): UseGameResult {
 
       submittingRef.current = true;
       setIsSubmitting(true);
+      const previousHand = myHand;
+      // Optimistic: pull the dead card out of hand immediately so it
+      // doesn't look stuck/unresponsive; the drawn replacement arrives
+      // moments later via the "hands" Realtime subscription.
+      setMyHand((prev) => prev.filter((c) => c.instanceId !== card.instanceId));
       try {
         const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
           p_game_id: game.id,
@@ -302,13 +337,16 @@ export function useGame(gameId: string | null): UseGameResult {
           p_suit: card.suit,
           p_instance_id: card.instanceId,
         });
-        if (rpcError) setError(rpcError.message);
+        if (rpcError) {
+          setError(rpcError.message);
+          setMyHand(previousHand);
+        }
       } finally {
         submittingRef.current = false;
         setIsSubmitting(false);
       }
     },
-    [game, players, myPlayerId],
+    [game, players, myPlayerId, myHand],
   );
 
   return {
