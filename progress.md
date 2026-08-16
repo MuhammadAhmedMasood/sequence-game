@@ -184,6 +184,29 @@ These were each non-obvious, verified by direct reproduction, not guessed:
    `edge_cases.md` and `lib/game/__tests__/edge-cases.test.ts` for the full
    11-case audit this came out of, cases 1-3 were the ones that actually
    failed before the fix).
+8. **A player's own hand could permanently lose a card after playing it**
+   (`hooks/useGame.ts`, `playMove`/`swapDeadCard`) — reported live: one
+   player's hand stayed one card short after their turn, on a mobile
+   connection. Root cause: after the optimistic "remove the played card"
+   update, the code relied entirely on the `hands` Realtime subscription
+   to deliver the replacement drawn card — but `play_card_and_draw`'s RPC
+   response already *returns* the caller's fully updated hand (card
+   removed + replacement drawn) directly, and the code was ignoring it.
+   If that Realtime event was ever missed (exactly the same no-replay
+   risk bug 6 above already documents for `games`/`players`, but there
+   was no fallback at all for `hands`), the hand stayed short with
+   nothing to correct it short of a manual reload. Fixed two ways: (a)
+   both functions now apply the RPC's own returned hand directly, so the
+   acting player's hand is correct immediately regardless of Realtime
+   delivery; (b) added a bounded 4s poll for the player's own hand
+   (visible tabs only, skipped while a move is mid-flight), mirroring the
+   existing games/players poll, so even a client that never calls the RPC
+   itself (e.g. the initial deal on game start) self-heals within a few
+   seconds if its own `hands` Realtime event was dropped. Verified live:
+   the underlying data was always correct in the DB — reproduced the
+   "empty hand right after Start game" case, confirmed it was a delivery
+   gap (not a data bug) by watching the same `hands` select the poll now
+   runs fix it once the tab is genuinely visible.
 
 ## Decisions worth knowing about
 

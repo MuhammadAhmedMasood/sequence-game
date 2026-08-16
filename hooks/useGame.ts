@@ -164,11 +164,11 @@ export function useGame(gameId: string | null): UseGameResult {
   // within that join window, or whose connection blips for even a
   // couple of seconds, can miss the event outright — with nothing else
   // to correct it, their screen would stay on the wrong turn
-  // indefinitely. This polls games+players only (not hands, which is
-  // per-player secret data with no monotonic counter to guard against a
-  // stale overwrite of an optimistic in-flight move) every few seconds
-  // so the client self-heals within a bounded window even if every
-  // Realtime event for a move was dropped.
+  // indefinitely. This polls games+players every few seconds so the
+  // client self-heals within a bounded window even if every Realtime
+  // event for a move was dropped. The matching poll for "hands" lives in
+  // its own effect further below, guarded differently since it's
+  // per-player secret data with no monotonic counter to compare against.
   useEffect(() => {
     if (!gameId) return;
     const interval = setInterval(() => {
@@ -264,6 +264,37 @@ export function useGame(gameId: string | null): UseGameResult {
     };
   }, [myPlayerId]);
 
+  // Bounded fallback under the "hands" Realtime subscription above, same
+  // idea as the games/players poll but reproduced directly rather than
+  // reused from it, matching the different guard case (players/hands
+  // and games/players run in separate effects since they only need each
+  // other's own dependency, not both). The "hands" INSERT/UPDATE event
+  // was observed being missed in exactly the two windows the comment
+  // above already calls out: the deal_game INSERT racing the channel's
+  // own join right as the host clicks "Start game", and a play_card_and_
+  // draw UPDATE dropped outright on a flaky (often mobile) connection —
+  // in both cases nothing else ever corrected the hand, leaving it
+  // permanently short or empty until a manual reload forced a refetch.
+  // Skipped entirely while a move is mid-flight (submittingRef) so this
+  // can't race the optimistic hand update playMove/swapDeadCard apply
+  // locally before their own RPC call resolves.
+  useEffect(() => {
+    if (!myPlayerId) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (submittingRef.current) return;
+      supabase
+        .from("hands")
+        .select("cards")
+        .eq("player_id", myPlayerId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setMyHand(data.cards ?? []);
+        });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [myPlayerId]);
+
   const playMove = useCallback(
     async (card: CardInstance, action: MoveAction) => {
       if (submittingRef.current) return;
@@ -329,18 +360,32 @@ export function useGame(gameId: string | null): UseGameResult {
         );
         setMyHand((prev) => prev.filter((c) => c.instanceId !== card.instanceId));
 
-        const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
-          p_game_id: game.id,
-          p_rank: card.rank,
-          p_suit: card.suit,
-          p_instance_id: card.instanceId,
-        });
+        // play_card_and_draw returns the caller's fully updated hand
+        // (card removed + replacement drawn) directly in its response —
+        // applied here rather than left to arrive via the "hands"
+        // Realtime subscription. Realtime delivery isn't guaranteed
+        // promptly on every connection (this was hit on mobile networks:
+        // the played card visibly left the hand, but no replacement ever
+        // arrived, permanently leaving the hand one card short), so the
+        // RPC's own response is the reliable source of truth here; the
+        // Realtime subscription is still useful as a secondary sync path
+        // (e.g. catching up a reconnecting tab).
+        const { data: updatedHand, error: rpcError } = await supabase.rpc(
+          "play_card_and_draw",
+          {
+            p_game_id: game.id,
+            p_rank: card.rank,
+            p_suit: card.suit,
+            p_instance_id: card.instanceId,
+          },
+        );
         if (rpcError) {
           setError(rpcError.message);
           setGame(previousGame);
           setMyHand(previousHand);
           return;
         }
+        if (updatedHand) setMyHand(updatedHand as CardInstance[]);
 
         const { error: updateError } = await supabase
           .from("games")
@@ -399,19 +444,26 @@ export function useGame(gameId: string | null): UseGameResult {
       setIsSubmitting(true);
       const previousHand = myHand;
       // Optimistic: pull the dead card out of hand immediately so it
-      // doesn't look stuck/unresponsive; the drawn replacement arrives
-      // moments later via the "hands" Realtime subscription.
+      // doesn't look stuck/unresponsive. The RPC's response below carries
+      // the authoritative replaced hand — see the matching comment in
+      // playMove for why that's used directly instead of waiting on the
+      // "hands" Realtime subscription.
       setMyHand((prev) => prev.filter((c) => c.instanceId !== card.instanceId));
       try {
-        const { error: rpcError } = await supabase.rpc("play_card_and_draw", {
-          p_game_id: game.id,
-          p_rank: card.rank,
-          p_suit: card.suit,
-          p_instance_id: card.instanceId,
-        });
+        const { data: updatedHand, error: rpcError } = await supabase.rpc(
+          "play_card_and_draw",
+          {
+            p_game_id: game.id,
+            p_rank: card.rank,
+            p_suit: card.suit,
+            p_instance_id: card.instanceId,
+          },
+        );
         if (rpcError) {
           setError(rpcError.message);
           setMyHand(previousHand);
+        } else if (updatedHand) {
+          setMyHand(updatedHand as CardInstance[]);
         }
       } finally {
         submittingRef.current = false;
