@@ -19,12 +19,34 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
 ## Status: all 5 original milestones complete, plus a polish/fixes round
 
 1. **Static board + hand UI** — done
-2. **Pure game-logic module + unit tests** — done, 63 tests passing
+2. **Pure game-logic module + unit tests** — done, 81 tests passing
 3. **Supabase integration (live multiplayer)** — done
 4. **Full flow** (landing → lobby → live game) — done
 5. **Polish** (visuals, mobile, score tally, win/rematch) — done
+6. **Sequence-detection edge-case audit** (`edge_cases.md`, all 11 cases) —
+   done; found and fixed one real bug (see "Hard-won bugs" #7)
 
 `npm run build` and `npm run test` are both green as of the last commit.
+Pushed to GitHub — see "Repository" below.
+
+## Repository
+
+- **Remote**: `https://github.com/MuhammadAhmedMasood/sequence-game` (public,
+  no description/topics set yet). Local `main` tracks `origin/main`, fully
+  in sync as of the last commit.
+- **Auth for pushing**: GitHub CLI (`gh`), installed via Homebrew at
+  `/opt/homebrew/bin/gh` — not on this shell's cached `PATH`, so it needs the
+  full path (or a fresh terminal) if `gh` comes back as "command not found"
+  again. Logged in as `MuhammadAhmedMasood`; `gh auth setup-git` already
+  configured git to use it, so plain `git push`/`git pull` work without
+  further flags.
+- An SSH key was also generated at `~/.ssh/id_ed25519` during setup before
+  the `gh` path was confirmed working — unused, but harmless to leave in
+  place if you'd rather switch the remote to SSH later
+  (`git@github.com:MuhammadAhmedMasood/sequence-game.git`).
+- `.env.local` (Supabase URL + anon key) is correctly gitignored and has
+  never been committed — confirmed via `git ls-files` and a check of the
+  pushed tree on GitHub.
 
 ## Architecture
 
@@ -181,7 +203,7 @@ These were each non-obvious, verified by direct reproduction, not guessed:
 
 ## Testing notes for future sessions
 
-- `npm run test` (Vitest) covers all of `lib/game/` — 63 tests, keep green.
+- `npm run test` (Vitest) covers all of `lib/game/` — 81 tests, keep green.
 - For manual multiplayer testing without two real browser identities: insert
   a second/third player row directly via the Supabase SQL Editor (bypasses
   RLS as the `postgres` role) rather than trying to fake a second session in
