@@ -1,0 +1,206 @@
+# Sequence Game — Progress Log
+
+Living summary of what's been built, why, and what's left. Update this file
+after future milestones/fixes so a new session can resume with full context
+without re-reading the whole git history.
+
+## What this is
+
+A web implementation of the board game Sequence, playable online with friends
+via a shareable room link. No accounts — a random per-browser identity
+(Supabase Anonymous Auth) identifies "me" within a room. See `docs/RULES.md`
+for the authoritative game rules and `CLAUDE.md` for project conventions.
+
+**Stack**: Next.js 16 (App Router) + TypeScript + Tailwind CSS, Supabase
+(Postgres + Realtime + Anonymous Auth) for multiplayer state, Vitest for the
+game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
+(deployment to Vercel is explicitly out of scope so far).
+
+## Status: all 5 original milestones complete, plus a polish/fixes round
+
+1. **Static board + hand UI** — done
+2. **Pure game-logic module + unit tests** — done, 63 tests passing
+3. **Supabase integration (live multiplayer)** — done
+4. **Full flow** (landing → lobby → live game) — done
+5. **Polish** (visuals, mobile, score tally, win/rematch) — done
+
+`npm run build` and `npm run test` are both green as of the last commit.
+
+## Architecture
+
+- `lib/game/` — pure, framework-free game logic (deck, deal, moves,
+  sequences, jacks, win condition, turn order, board layout). No React or
+  Supabase imports; unit-tested in `lib/game/__tests__/`. Shared verbatim
+  between the local hot-seat demo and the live Supabase-backed game.
+- `lib/supabase/` — `client.ts` (browser client, session in `localStorage` so
+  identity survives closed tabs/crashes — tradeoff: two tabs in one browser
+  share one identity), `queries.ts` (createRoom, joinRoom, setTeam, startGame,
+  rematchGame), `types.ts` (DB row shapes).
+- `hooks/useGame.ts` — the live-game data hook. Subscribes to Realtime
+  Postgres Changes for `games`/`players`/`hands`, does optimistic local
+  updates on every move, and layers two resilience mechanisms on top (see
+  "Hard-won bugs" below): a turn-number staleness guard and a 4s polling
+  fallback.
+- `app/room/[roomCode]/RoomClient.tsx` — the main orchestrator: lobby vs.
+  live game vs. game-over, turn indicator, score sidebar, jack legend, board
+  click handling.
+- `components/lobby/WaitingRoom.tsx` — lobby UI, including the 2v2
+  drag-and-drop team picker (Pointer Events, not HTML5 DnD, so it works on
+  touch).
+- `components/game/Scoreboard.tsx` — per-player/per-team sequence-progress
+  panel (sidebar on desktop, compact pill bar on mobile).
+- `supabase/schema.sql` — full schema: `games`, `players`, `hands` (secret),
+  `decks` (secret, no client access at all), `moves`; RLS policies; three
+  `SECURITY DEFINER` RPCs (`deal_game`, `play_card_and_draw`,
+  `rematch_game`). This file is the source of truth — always apply changes
+  here to the live Supabase project too via the SQL Editor.
+
+**Trust model** (deliberate, documented in the plan): RLS + RPCs hard-enforce
+identity, turn order, and hand/deck secrecy. Move *content* legality (valid
+square, real sequence, correct dead-card claim) is validated by the shared
+`lib/game/` module on every client, not re-verified server-side. Acceptable
+for a casual game among friends; avoids standing up an Edge Function layer.
+
+## Game modes
+
+- 2 players: 7 cards each, 2 sequences to win.
+- 3 players: 6 cards each, 1 sequence to win.
+- 2 teams of 2: 6 cards each, 2 sequences to win, turn order alternates
+  TeamA→TeamB→TeamA→TeamB (seat order is recomputed from each player's final
+  team choice at start time, not join order).
+
+## Features implemented
+
+- Room creation/join via 5-character code; anonymous per-browser identity;
+  reconnect support (closing/reopening the tab resumes the same seat and
+  hand).
+- Host-only lobby controls: pick mode, set shared hints-on/off, start game.
+- 2v2 team assignment via drag-and-drop (self-only — a player can drag their
+  own name between Team A/B columns, not anyone else's; see "Decisions" below
+  for why).
+- Full board/hand UI with authentic jack card art (LGPL SVG-Cards deck) and a
+  W/R badge legend (two-eyed jack = wild, one-eyed = anti-wild) since the
+  deck's art doesn't reliably distinguish them at a glance.
+- Hints mode: highlights every square the current player could legally play,
+  excluding jacks (a two-eyed jack matches every open square, which would
+  flood the board). Defaults on.
+- Turn indicator shows the actual current player's name (or team + name in
+  2v2), not a generic "waiting" message.
+- "You: <color>" badge always visible so a player never has to guess their
+  own chip color.
+- Score/sequence-progress panel, always visible (sidebar desktop, compact bar
+  mobile), highlighting the viewer's own row.
+- Optimistic UI: chip placement and turn advancement update instantly on
+  click, not after a network round trip.
+- Win detection: the game ends the instant a player/team reaches
+  sequencesToWin, live, for every connected client.
+- Game-over screen: "Play again" (host-only, redeals immediately with the
+  same lineup) and, in 2v2 only, "Shuffle teams & play again" (back to the
+  lobby team picker). "Exit to home" available to everyone.
+- Audible + visual "your turn" notification (Web Audio synthesized chime, no
+  external asset).
+- Rapid-double-click guard on board squares (ref-based synchronous check,
+  since React state updates are batched/async).
+- Full visual redesign (indigo/violet gradient theme, glassy cards) across
+  landing page, lobby, and game view; verified usable at mobile viewport
+  widths (390×844) via an emulation trick, and confirmed genuinely working
+  on both a real phone and laptop after the LAN-access fix below.
+
+## Hard-won bugs (read before touching `hooks/useGame.ts` again)
+
+These were each non-obvious, verified by direct reproduction, not guessed:
+
+1. **Mobile/LAN access silently broken**: `next dev` blocks every
+   `/_next/*` client-script chunk request whose Origin isn't localhost by
+   default. The page's HTML loaded fine over the LAN IP, but every client
+   component chunk 403'd, so nothing ever hydrated — no visible error, just
+   dead buttons. Fixed with `allowedDevOrigins: ["192.168.*.*"]` in
+   `next.config.ts` (wildcarded, not the exact IP, since home routers
+   commonly hand out a different address later). Dev-only; irrelevant once
+   deployed.
+2. **Chip placement "flashing back" / other player's turn never updating**:
+   the reconnect-catchup refetch (fires on `visibilitychange`/`online`) could
+   resolve *after* an in-flight optimistic move update and silently overwrite
+   it with the pre-move snapshot. Fixed with a staleness guard
+   (`applyIfNewer` in `useGame.ts`) that rejects any incoming `games` row
+   whose `turn_number` is behind what's already showing — *unless* `status`
+   also changed, which is always an intentional transition, never something a
+   stale read invents. (The first version of this guard didn't have that
+   `status` carve-out and consequently broke rematches — see next point.)
+3. **Rematch appearing to silently do nothing**: the fix above, before the
+   `status`-change carve-out was added, correctly rejected stale mid-game
+   reads but *also* rejected the legitimate `turn_number` reset a rematch
+   performs (0 is "behind" the finished game's turn_number), permanently
+   stranding the client on the finished board until a manual reload.
+4. **Win detection was simply missing**: `checkWinner` existed as a tested
+   pure function but nothing ever called it in the live multiplayer path —
+   `games.winner` stayed `null` forever regardless of the board. Not a
+   regression, just never wired up until this was explicitly built.
+5. **Landing page occasionally stuck on "Setting up the game…"**: the local
+   hot-seat demo's game was created eagerly on every mount, and the "which
+   screen to show" check for it ran *before* the check for whether to show
+   the online panel at all — so the online panel's render was needlessly
+   gated behind local-game setup finishing. Reordered so the online panel
+   never depends on that state, and the local game is now created lazily
+   (only when "Practice locally" is actually clicked).
+6. **Missed Realtime events with no recovery**: a client whose Realtime
+   channel subscription hadn't finished joining yet (e.g. right as the host
+   clicks "Start game") can miss that event outright — Postgres Changes has
+   no backlog/replay. Added a lightweight 4s poll (`games`+`players` only,
+   visible tabs only, guarded by the same staleness check) as a bounded
+   self-heal under Realtime, not a replacement for it.
+7. **Extending a corner-based sequence by one chip was miscounted as a
+   second sequence** (`lib/game/sequences.ts`, `findNewSequences`). The only
+   guard against reusing chips was a per-square cap ("no square counts
+   toward more than 2 sequences") — that alone doesn't stop a sliding
+   5-window that overlaps a just-recorded sequence by 4 squares, since each
+   of those 4 squares individually still has usage < 2. The real rule is
+   pairwise: any two sequences may share at most 1 square, checked between
+   the candidate and *each* already-recorded sequence independently, not
+   just a per-square total. Fixed by adding that pairwise overlap check
+   alongside the existing per-square cap (both are needed — see
+   `edge_cases.md` and `lib/game/__tests__/edge-cases.test.ts` for the full
+   11-case audit this came out of, cases 1-3 were the ones that actually
+   failed before the fix).
+
+## Decisions worth knowing about
+
+- **Drag-and-drop team picker is self-only, not "any player can move any
+  player."** The wider version was scoped, but would have required loosening
+  a `players` RLS policy so any seated player could rewrite any other
+  player's row — the user was asked and chose the narrower, safer scope.
+- **Trust model is intentionally not adversarial-hardened** (see
+  "Architecture" above) — this is a casual game for friends, not a public
+  competitive product. Don't over-engineer server-side validation beyond
+  what's already there without checking whether it's actually warranted.
+- **`localStorage` (not `sessionStorage`) for the auth session** — chosen so
+  a closed/crashed tab can rejoin the same seat. Tradeoff: two tabs in the
+  same browser are the same identity, so multiplayer testing from one browser
+  needs either a second browser profile or direct SQL-inserted player rows
+  (see testing note below).
+
+## Testing notes for future sessions
+
+- `npm run test` (Vitest) covers all of `lib/game/` — 63 tests, keep green.
+- For manual multiplayer testing without two real browser identities: insert
+  a second/third player row directly via the Supabase SQL Editor (bypasses
+  RLS as the `postgres` role) rather than trying to fake a second session in
+  the same browser.
+- The Supabase SQL Editor's "Potential issue detected" confirmation dialog
+  appears for any DML/DDL — click through it (usually "Run without RLS" or
+  "Run query" depending on the warning).
+- After any `supabase/schema.sql` change, apply the delta to the live
+  project via the SQL Editor — the file being updated locally does **not**
+  auto-apply.
+- If `npm run dev` behaves inexplicably (clicks doing nothing, hydration
+  mismatches) after a long session with many HMR reloads, a clean restart
+  (`kill` the process, `npm run dev` again) has resolved it more than once —
+  worth trying before assuming a real bug.
+
+## Not yet done / explicitly out of scope so far
+
+- Deployment (Vercel). Nothing blocking it, just hasn't been asked for yet.
+- Any account system (by design — room-code based, no auth beyond anonymous
+  per-browser identity).
+- Kicking/removing a player from a room, or cleaning up abandoned rooms.
+- Spectator mode.

@@ -104,6 +104,28 @@ export function findNewSequences(
       );
       if (!eligible) continue;
 
+      // Two sequences may share at most 1 chip in total — not just "each
+      // individual square hasn't been reused twice yet" (the check above),
+      // which alone lets a window that's simply the previous sequence
+      // slid over by one square sneak through: e.g. a corner + 4-chip
+      // sequence [0,1,2,3,4] extended by a 5th real chip proposes
+      // [1,2,3,4,5], and every one of those squares individually still has
+      // usage < 2 even though it overlaps the first sequence by 4 squares.
+      // Reject any candidate that shares more than 1 non-corner square
+      // with any single already-recorded sequence (this move's own
+      // earlier finds included, so two sequences from one placement can't
+      // over-share with each other either).
+      const nonCornerSquares = squares.filter((s) => !isCornerSquare(s));
+      const overSharesWithSomeSequence = [...existingSequences, ...newSequences].some(
+        (seq) => {
+          if (seq.owner !== owner) return false;
+          const seqSquares = new Set(seq.squares.filter((s) => !isCornerSquare(s)));
+          const shared = nonCornerSquares.filter((s) => seqSquares.has(s)).length;
+          return shared > 1;
+        },
+      );
+      if (overSharesWithSomeSequence) continue;
+
       newSequences.push({
         id: `${owner}-${direction}-${squares[0]}-${squares[squares.length - 1]}`,
         owner,
