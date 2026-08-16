@@ -30,7 +30,6 @@ import { checkWinner } from "@/lib/game/winCondition";
 
 interface ModeConfig {
   handSize: number;
-  sequencesToWin: number;
   seatInputs: SeatPlayerInput[];
 }
 
@@ -38,10 +37,12 @@ interface ModeConfig {
 // Milestone 4 will build. Two-team players share a chip color on purpose:
 // a completed sequence belongs to the team, not an individual player, so
 // win-condition counting (see winCondition.ts) needs no team-specific case.
+// Sequences-to-win is NOT part of this per-mode config — it's a separate
+// 1-or-2 toggle (default 2), same as the online lobby's control, since
+// even 3-player games can feel too short at 1 sequence.
 const MODE_CONFIG: Record<GameMode, ModeConfig> = {
   "two-player": {
     handSize: 7,
-    sequencesToWin: 2,
     seatInputs: [
       { id: "p1", displayName: "Player 1", chipColor: "red" },
       { id: "p2", displayName: "Player 2", chipColor: "blue" },
@@ -49,7 +50,6 @@ const MODE_CONFIG: Record<GameMode, ModeConfig> = {
   },
   "three-player": {
     handSize: 6,
-    sequencesToWin: 1,
     seatInputs: [
       { id: "p1", displayName: "Player 1", chipColor: "red" },
       { id: "p2", displayName: "Player 2", chipColor: "blue" },
@@ -58,7 +58,6 @@ const MODE_CONFIG: Record<GameMode, ModeConfig> = {
   },
   "two-team": {
     handSize: 6,
-    sequencesToWin: 2,
     seatInputs: [
       { id: "a1", displayName: "Team A · P1", chipColor: "red", team: "A" },
       { id: "a2", displayName: "Team A · P2", chipColor: "red", team: "A" },
@@ -82,7 +81,7 @@ interface LocalGameState {
   winner: ChipColor | null;
 }
 
-function createLocalGame(mode: GameMode): LocalGameState {
+function createLocalGame(mode: GameMode, sequencesToWin: number): LocalGameState {
   const config = MODE_CONFIG[mode];
   const players = buildSeating(mode, config.seatInputs);
   const deck = shuffle(buildDeck());
@@ -95,7 +94,7 @@ function createLocalGame(mode: GameMode): LocalGameState {
   return {
     mode,
     players,
-    sequencesToWin: config.sequencesToWin,
+    sequencesToWin,
     board: {},
     sequences: [],
     sequenceUsage: {},
@@ -123,6 +122,7 @@ export default function Home() {
     null,
   );
   const [hintsEnabled, setHintsEnabled] = useState(false);
+  const [sequencesToWin, setSequencesToWin] = useState(2);
   // Defaults to the online panel: landing on this page shouldn't drop you
   // straight into a playable local board before you've even chosen
   // online vs. local — see the "Practice locally instead" link below.
@@ -136,8 +136,9 @@ export default function Home() {
   // up the game…" indefinitely instead of ever reaching the online panel.
   useEffect(() => {
     if (!showOnlinePanel && !game) {
-      setGame(createLocalGame("two-player"));
+      setGame(createLocalGame("two-player", sequencesToWin));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showOnlinePanel, game]);
 
   const currentPlayer = game ? game.players[game.currentSeatIndex] : null;
@@ -376,7 +377,7 @@ export default function Home() {
           <select
             value={activeGame.mode}
             onChange={(e) => {
-              setGame(createLocalGame(e.target.value as GameMode));
+              setGame(createLocalGame(e.target.value as GameMode, sequencesToWin));
               setSelectedInstanceId(null);
             }}
             className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs sm:text-sm dark:border-zinc-600 dark:bg-zinc-800"
@@ -403,6 +404,22 @@ export default function Home() {
               className="h-4 w-4 accent-emerald-500"
             />
             Hints
+          </label>
+          <label className="flex items-center gap-1 text-xs text-zinc-600 sm:text-sm dark:text-zinc-300">
+            Sequences to win
+            <select
+              value={sequencesToWin}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setSequencesToWin(value);
+                setGame(createLocalGame(activeGame.mode, value));
+                setSelectedInstanceId(null);
+              }}
+              className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs sm:text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+            </select>
           </label>
           <button
             type="button"

@@ -187,16 +187,23 @@ export async function setTeam(playerId: string, team: Team): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-// hintsEnabled is a whole-game setting the host picks once, here — every
-// player sees the same value for the rest of the game (see
-// RoomClient.tsx). The update is only reachable by the host in the first
+// hintsEnabled and sequencesToWin are whole-game settings the host picks
+// once, here — every player sees the same values for the rest of the
+// game (see RoomClient.tsx). sequencesToWin overrides the per-mode
+// default already written by createRoom (MODE_LIMITS) — it's a plain 1
+// or 2 toggle, not mode-derived, since even 3-player games can feel too
+// short at 1. The update is only reachable by the host in the first
 // place: the "update on your turn" RLS policy requires seat_index to
 // match games.current_seat_index, which defaults to 0 (the host's seat)
 // until deal_game changes it.
-export async function startGame(gameId: string, hintsEnabled: boolean): Promise<void> {
+export async function startGame(
+  gameId: string,
+  hintsEnabled: boolean,
+  sequencesToWin: number,
+): Promise<void> {
   const { error: settingError } = await supabase
     .from("games")
-    .update({ hints_enabled: hintsEnabled })
+    .update({ hints_enabled: hintsEnabled, sequences_to_win: sequencesToWin })
     .eq("id", gameId);
   if (settingError) throw new Error(settingError.message);
 

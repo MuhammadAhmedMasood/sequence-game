@@ -74,6 +74,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [hintsDraft, setHintsDraft] = useState(true);
+  const [sequencesToWinDraft, setSequencesToWinDraft] = useState(2);
   const [rematching, setRematching] = useState(false);
 
   const myPlayer = players.find((p) => p.id === myPlayerId);
@@ -187,7 +188,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
     if (!game) return;
     setStarting(true);
     try {
-      await startGame(game.id, hintsDraft);
+      await startGame(game.id, hintsDraft, sequencesToWinDraft);
     } finally {
       setStarting(false);
     }
@@ -235,6 +236,8 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
         onSetTeam={handleSetTeam}
         hintsDraft={hintsDraft}
         onHintsChange={setHintsDraft}
+        sequencesToWinDraft={sequencesToWinDraft}
+        onSequencesToWinChange={setSequencesToWinDraft}
         onStart={handleStart}
         starting={starting}
       />

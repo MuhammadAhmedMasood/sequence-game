@@ -12,6 +12,8 @@ interface WaitingRoomProps {
   onSetTeam: (team: Team) => void;
   hintsDraft: boolean;
   onHintsChange: (value: boolean) => void;
+  sequencesToWinDraft: number;
+  onSequencesToWinChange: (value: number) => void;
   onStart: () => void;
   starting: boolean;
 }
@@ -205,6 +207,8 @@ export default function WaitingRoom({
   onSetTeam,
   hintsDraft,
   onHintsChange,
+  sequencesToWinDraft,
+  onSequencesToWinChange,
   onStart,
   starting,
 }: WaitingRoomProps) {
@@ -316,6 +320,25 @@ export default function WaitingRoom({
               />
               Enable hints for everyone
             </label>
+            <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+              <span>Sequences to win</span>
+              <div className="flex overflow-hidden rounded-lg border border-zinc-300 dark:border-zinc-600">
+                {([1, 2] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => onSequencesToWinChange(n)}
+                    className={`px-3 py-1 text-sm font-medium transition ${
+                      sequencesToWinDraft === n
+                        ? "bg-indigo-500 text-white"
+                        : "bg-white text-zinc-600 hover:bg-indigo-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               type="button"
               disabled={starting || !canStart}
