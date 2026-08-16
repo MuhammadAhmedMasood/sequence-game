@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyMove, validateMove } from "@/lib/game/moves";
+import { checkWinner } from "@/lib/game/winCondition";
 import type {
   CardInstance,
   Move,
@@ -19,14 +20,24 @@ import type { GameRow, PlayerRow } from "@/lib/supabase/types";
 // happens to resolve *after* an optimistic local update (e.g. a
 // visibilitychange firing mid-move) would silently revert the board and
 // turn indicator back to the pre-move snapshot — the moved chip
-// "disappears" and the turn never advances for anyone. turn_number only
-// moves forward within a single game, so rejecting any incoming row
-// whose turn_number is behind what's already showing is always safe.
+// "disappears" and the turn never advances for anyone.
+//
+// turn_number only moves forward *within one round*, so rejecting an
+// incoming row whose turn_number is behind what's already showing is
+// safe there — but a rematch deliberately resets it to 0, and a naive
+// turn_number-only check would reject that legitimate reset outright,
+// permanently stranding the client on the finished game's board. A
+// status change (lobby -> in_progress -> completed -> lobby -> ...) is
+// always an intentional server-driven transition in this app, never
+// something a stale read invents, so it always overrides the
+// turn_number check.
 function applyIfNewer(
   prev: GameRow | null,
   incoming: GameRow,
 ): GameRow {
-  if (!prev || incoming.turn_number >= prev.turn_number) return incoming;
+  if (!prev) return incoming;
+  if (incoming.status !== prev.status) return incoming;
+  if (incoming.turn_number >= prev.turn_number) return incoming;
   return prev;
 }
 
@@ -290,6 +301,10 @@ export function useGame(gameId: string | null): UseGameResult {
           move,
           actingChipColor: me.chipColor,
         });
+        // Checked on every placing move: a sequence just completed by this
+        // move can immediately satisfy sequencesToWin, and the game has to
+        // end right then rather than waiting for some later check.
+        const winner = checkWinner(players, applied.sequences, game.sequences_to_win);
 
         // Optimistic update: apply the chip placement and turn advance
         // locally right away, instead of waiting on the RPC + games UPDATE
@@ -307,6 +322,8 @@ export function useGame(gameId: string | null): UseGameResult {
                 discard_top: applied.discardTop,
                 current_seat_index: applied.currentSeatIndex,
                 turn_number: applied.turnNumber,
+                winner,
+                status: winner ? "completed" : prev.status,
               }
             : prev,
         );
@@ -334,6 +351,8 @@ export function useGame(gameId: string | null): UseGameResult {
             discard_top: applied.discardTop,
             current_seat_index: applied.currentSeatIndex,
             turn_number: applied.turnNumber,
+            winner,
+            status: winner ? "completed" : game.status,
           })
           .eq("id", game.id);
         if (updateError) {

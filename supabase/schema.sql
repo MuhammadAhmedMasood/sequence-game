@@ -347,6 +347,55 @@ begin
 end;
 $$;
 
+-- Resets a finished game back to a fresh round: clears the board,
+-- sequences, winner, hands, and deck. Host-only (mirrors "only the host
+-- starts a game") and only once the previous round has actually ended —
+-- a mid-game reset would strand every other client's board state with
+-- no way to recover it. p_reset_teams sends players back to the lobby's
+-- team picker (2v2 "shuffle teams"); otherwise this redeals immediately
+-- via deal_game so the same lineup goes straight back into a new round
+-- without a lobby detour.
+create or replace function rematch_game(p_game_id uuid, p_reset_teams boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from players
+    where game_id = p_game_id and auth_user_id = auth.uid() and seat_index = 0
+  ) then
+    raise exception 'only the host can start a rematch';
+  end if;
+
+  if not exists (
+    select 1 from games where id = p_game_id and status = 'completed'
+  ) then
+    raise exception 'game has not finished yet';
+  end if;
+
+  delete from hands where game_id = p_game_id;
+  delete from decks where game_id = p_game_id;
+
+  update games
+  set status = 'lobby',
+      board_chips = '{}'::jsonb,
+      sequences = '[]'::jsonb,
+      sequence_usage = '{}'::jsonb,
+      discard_top = null,
+      winner = null,
+      turn_number = 0,
+      current_seat_index = 0,
+      deck_count = 0
+  where id = p_game_id;
+
+  if not p_reset_teams then
+    perform deal_game(p_game_id);
+  end if;
+end;
+$$;
+
 -- Enable Realtime broadcasts (Postgres Changes) for these tables. Easy to
 -- forget: RLS alone doesn't make row changes stream to clients — the
 -- table also has to be added to the supabase_realtime publication.

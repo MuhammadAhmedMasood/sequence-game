@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Board from "@/components/board/Board";
 import Scoreboard from "@/components/game/Scoreboard";
@@ -12,7 +13,7 @@ import { isJack } from "@/lib/game/jacks";
 import { getPlayableSquares } from "@/lib/game/moves";
 import type { CardInstance, ChipColor, MoveAction, SquareIndex, Team } from "@/lib/game/types";
 import { supabase } from "@/lib/supabase/client";
-import { setTeam, startGame } from "@/lib/supabase/queries";
+import { rematchGame, setTeam, startGame } from "@/lib/supabase/queries";
 
 interface RoomClientProps {
   roomCode: string;
@@ -31,6 +32,7 @@ const CHIP_LABELS: Record<ChipColor, string> = {
 };
 
 export default function RoomClient({ roomCode }: RoomClientProps) {
+  const router = useRouter();
   const [gameId, setGameId] = useState<string | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
@@ -72,6 +74,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [hintsDraft, setHintsDraft] = useState(true);
+  const [rematching, setRematching] = useState(false);
 
   const myPlayer = players.find((p) => p.id === myPlayerId);
   const isHost = myPlayer?.seatIndex === 0;
@@ -190,6 +193,22 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
     }
   }
 
+  async function handleRematch(resetTeams: boolean) {
+    if (!game) return;
+    setRematching(true);
+    try {
+      await rematchGame(game.id, resetTeams);
+    } catch (e) {
+      console.error("Failed to start rematch", e);
+    } finally {
+      setRematching(false);
+    }
+  }
+
+  function handleExit() {
+    router.push("/");
+  }
+
   if (lookupError) {
     return (
       <main className="flex h-dvh items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-zinc-500 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
@@ -263,8 +282,43 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
       {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
 
       {game.winner ? (
-        <div className="shrink-0 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-400 px-3 py-1 text-sm font-semibold text-amber-950 shadow-sm">
-          {winningLabel ?? "Someone"} wins!
+        <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-5 text-center shadow-xl dark:border-amber-900 dark:from-amber-950/60 dark:to-zinc-900">
+          <p className="bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-xl font-extrabold text-transparent">
+            {winningLabel ?? "Someone"} wins!
+          </p>
+          {isHost ? (
+            <div className="flex w-full flex-col gap-2">
+              <button
+                type="button"
+                disabled={rematching}
+                onClick={() => handleRematch(false)}
+                className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {rematching ? "Starting…" : "Play again"}
+              </button>
+              {game.mode === "two-team" ? (
+                <button
+                  type="button"
+                  disabled={rematching}
+                  onClick={() => handleRematch(true)}
+                  className="w-full rounded-xl border border-zinc-300 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  {rematching ? "Starting…" : "Shuffle teams & play again"}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Waiting for the host to start a rematch…
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleExit}
+            className="text-sm text-zinc-500 underline underline-offset-2 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
+          >
+            Exit to home
+          </button>
         </div>
       ) : selectedCardIsDead ? (
         <div className="flex shrink-0 items-center gap-2 rounded-lg bg-red-100 px-3 py-1 text-sm text-red-800 dark:bg-red-900/40 dark:text-red-200">

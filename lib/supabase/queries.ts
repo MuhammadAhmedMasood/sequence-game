@@ -174,12 +174,6 @@ export async function joinRoom(roomCode: string, displayName: string): Promise<J
   throw new Error(lastError instanceof Error ? lastError.message : "Could not claim a seat");
 }
 
-// hintsEnabled is a whole-game setting the host picks once, here — every
-// player sees the same value for the rest of the game (see
-// RoomClient.tsx). The update is only reachable by the host in the first
-// place: the "update on your turn" RLS policy requires seat_index to
-// match games.current_seat_index, which defaults to 0 (the host's seat)
-// until deal_game changes it.
 // Lets a player switch their own team in the 2v2 lobby before the game
 // starts. Relies on the "update own player before start" RLS policy
 // (auth_user_id = auth.uid(), and only while games.status = 'lobby');
@@ -193,6 +187,12 @@ export async function setTeam(playerId: string, team: Team): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// hintsEnabled is a whole-game setting the host picks once, here — every
+// player sees the same value for the rest of the game (see
+// RoomClient.tsx). The update is only reachable by the host in the first
+// place: the "update on your turn" RLS policy requires seat_index to
+// match games.current_seat_index, which defaults to 0 (the host's seat)
+// until deal_game changes it.
 export async function startGame(gameId: string, hintsEnabled: boolean): Promise<void> {
   const { error: settingError } = await supabase
     .from("games")
@@ -201,5 +201,18 @@ export async function startGame(gameId: string, hintsEnabled: boolean): Promise<
   if (settingError) throw new Error(settingError.message);
 
   const { error } = await supabase.rpc("deal_game", { p_game_id: gameId });
+  if (error) throw new Error(error.message);
+}
+
+// Host-only, only once the previous round actually ended (rematch_game
+// itself re-checks both — this call would just fail otherwise). Resets
+// the board/hands/deck and, when resetTeams is false, redeals
+// immediately so the room lands straight back in a fresh round; when
+// true, it goes back to the lobby's team picker instead.
+export async function rematchGame(gameId: string, resetTeams: boolean): Promise<void> {
+  const { error } = await supabase.rpc("rematch_game", {
+    p_game_id: gameId,
+    p_reset_teams: resetTeams,
+  });
   if (error) throw new Error(error.message);
 }
