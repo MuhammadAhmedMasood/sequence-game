@@ -25,6 +25,11 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
 5. **Polish** (visuals, mobile, score tally, win/rematch) — done
 6. **Sequence-detection edge-case audit** (`edge_cases.md`, all 11 cases) —
    done; found and fixed one real bug (see "Hard-won bugs" #7)
+7. **Sequences-to-win lobby toggle** (1 or 2, default 2, all modes) — done,
+   mirrors the existing hints toggle
+8. **Hand-sync bug fix** — a player's own hand could permanently lose a
+   card after playing it on an unreliable connection; done (see "Hard-won
+   bugs" #8)
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -60,9 +65,11 @@ Pushed to GitHub — see "Repository" below.
   rematchGame), `types.ts` (DB row shapes).
 - `hooks/useGame.ts` — the live-game data hook. Subscribes to Realtime
   Postgres Changes for `games`/`players`/`hands`, does optimistic local
-  updates on every move, and layers two resilience mechanisms on top (see
-  "Hard-won bugs" below): a turn-number staleness guard and a 4s polling
-  fallback.
+  updates on every move, and layers several resilience mechanisms on top
+  (see "Hard-won bugs" below): a turn-number staleness guard, a 4s
+  games/players polling fallback, a separate 4s own-hand polling
+  fallback, and applying `play_card_and_draw`'s RPC response directly
+  for the acting player's hand instead of trusting Realtime for it.
 - `app/room/[roomCode]/RoomClient.tsx` — the main orchestrator: lobby vs.
   live game vs. game-over, turn indicator, score sidebar, jack legend, board
   click handling.
@@ -85,18 +92,23 @@ for a casual game among friends; avoids standing up an Edge Function layer.
 
 ## Game modes
 
-- 2 players: 7 cards each, 2 sequences to win.
-- 3 players: 6 cards each, 1 sequence to win.
-- 2 teams of 2: 6 cards each, 2 sequences to win, turn order alternates
-  TeamA→TeamB→TeamA→TeamB (seat order is recomputed from each player's final
-  team choice at start time, not join order).
+- 2 players: 7 cards each.
+- 3 players: 6 cards each.
+- 2 teams of 2: 6 cards each, turn order alternates TeamA→TeamB→TeamA→TeamB
+  (seat order is recomputed from each player's final team choice at start
+  time, not join order).
+- Sequences-to-win is no longer fixed per mode — it's a host-controlled
+  lobby toggle (1 or 2, default 2, same UI pattern as the hints checkbox).
+  3-player games used to be hardcoded to 1 sequence, which felt too short,
+  so this is now the user's call for every mode.
 
 ## Features implemented
 
 - Room creation/join via 5-character code; anonymous per-browser identity;
   reconnect support (closing/reopening the tab resumes the same seat and
   hand).
-- Host-only lobby controls: pick mode, set shared hints-on/off, start game.
+- Host-only lobby controls: pick mode, set shared hints-on/off, set
+  sequences-to-win (1 or 2, default 2), start game.
 - 2v2 team assignment via drag-and-drop (self-only — a player can drag their
   own name between Team A/B columns, not anyone else's; see "Decisions" below
   for why).
