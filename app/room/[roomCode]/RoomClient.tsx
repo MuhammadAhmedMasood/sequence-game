@@ -71,7 +71,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
 
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const [hintsDraft, setHintsDraft] = useState(false);
+  const [hintsDraft, setHintsDraft] = useState(true);
 
   const myPlayer = players.find((p) => p.id === myPlayerId);
   const isHost = myPlayer?.seatIndex === 0;

@@ -13,6 +13,23 @@ import { ensureAuthUserId } from "@/lib/player/identity";
 import { supabase } from "@/lib/supabase/client";
 import type { GameRow, PlayerRow } from "@/lib/supabase/types";
 
+// Guards every place `game` gets overwritten from an external source
+// (Realtime echo, reconnect refetch, background poll) against clobbering
+// a more current state with a stale one. Without this, a refetch that
+// happens to resolve *after* an optimistic local update (e.g. a
+// visibilitychange firing mid-move) would silently revert the board and
+// turn indicator back to the pre-move snapshot — the moved chip
+// "disappears" and the turn never advances for anyone. turn_number only
+// moves forward within a single game, so rejecting any incoming row
+// whose turn_number is behind what's already showing is always safe.
+function applyIfNewer(
+  prev: GameRow | null,
+  incoming: GameRow,
+): GameRow {
+  if (!prev || incoming.turn_number >= prev.turn_number) return incoming;
+  return prev;
+}
+
 function toPlayerMeta(row: PlayerRow): PlayerMeta {
   return {
     id: row.id,
@@ -82,7 +99,7 @@ export function useGame(gameId: string | null): UseGameResult {
       if (playersResult.error) throw playersResult.error;
 
       const playerRows = playersResult.data ?? [];
-      setGame(gameResult.data);
+      setGame((prev) => applyIfNewer(prev, gameResult.data));
       setPlayers(playerRows.map(toPlayerMeta));
 
       const me = playerRows.find((p) => p.auth_user_id === authUserId);
@@ -129,6 +146,42 @@ export function useGame(gameId: string | null): UseGameResult {
     };
   }, [gameId, refetch]);
 
+  // Safety net under Realtime, not a replacement for it: a
+  // postgres_changes event only reaches this client if its channel
+  // subscription had already finished joining the moment the row
+  // changed (no backlog/replay). A player who clicks "Start game"
+  // within that join window, or whose connection blips for even a
+  // couple of seconds, can miss the event outright — with nothing else
+  // to correct it, their screen would stay on the wrong turn
+  // indefinitely. This polls games+players only (not hands, which is
+  // per-player secret data with no monotonic counter to guard against a
+  // stale overwrite of an optimistic in-flight move) every few seconds
+  // so the client self-heals within a bounded window even if every
+  // Realtime event for a move was dropped.
+  useEffect(() => {
+    if (!gameId) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      supabase
+        .from("games")
+        .select("*")
+        .eq("id", gameId)
+        .single()
+        .then(({ data }) => {
+          if (data) setGame((prev) => applyIfNewer(prev, data));
+        });
+      supabase
+        .from("players")
+        .select("*")
+        .eq("game_id", gameId)
+        .order("seat_index")
+        .then(({ data }) => {
+          if (data) setPlayers(data.map(toPlayerMeta));
+        });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [gameId]);
+
   useEffect(() => {
     if (!gameId) return;
 
@@ -137,7 +190,7 @@ export function useGame(gameId: string | null): UseGameResult {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
-        (payload) => setGame(payload.new as GameRow),
+        (payload) => setGame((prev) => applyIfNewer(prev, payload.new as GameRow)),
       )
       .on(
         "postgres_changes",
