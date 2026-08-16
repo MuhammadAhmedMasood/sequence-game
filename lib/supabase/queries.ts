@@ -180,6 +180,19 @@ export async function joinRoom(roomCode: string, displayName: string): Promise<J
 // place: the "update on your turn" RLS policy requires seat_index to
 // match games.current_seat_index, which defaults to 0 (the host's seat)
 // until deal_game changes it.
+// Lets a player switch their own team in the 2v2 lobby before the game
+// starts. Relies on the "update own player before start" RLS policy
+// (auth_user_id = auth.uid(), and only while games.status = 'lobby');
+// deal_game re-derives seat_index/turn order from each player's final
+// team choice, so no seat/turn bookkeeping is needed here.
+export async function setTeam(playerId: string, team: Team): Promise<void> {
+  const { error } = await supabase
+    .from("players")
+    .update({ team, chip_color: team === "A" ? "red" : "blue" })
+    .eq("id", playerId);
+  if (error) throw new Error(error.message);
+}
+
 export async function startGame(gameId: string, hintsEnabled: boolean): Promise<void> {
   const { error: settingError } = await supabase
     .from("games")

@@ -313,18 +313,38 @@ export default function Home() {
 
   if (showOnlinePanel) {
     return (
-      <main className="flex h-dvh w-full flex-col items-center justify-center gap-6 bg-gradient-to-b from-zinc-50 to-white p-4 dark:from-zinc-950 dark:to-zinc-900">
-        <div className="flex flex-col items-center gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+      <main className="relative flex min-h-dvh w-full flex-col items-center justify-center gap-8 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 py-10 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-300/30 blur-3xl dark:bg-indigo-700/20"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-purple-300/30 blur-3xl dark:bg-purple-700/20"
+        />
+
+        <div className="relative flex flex-col items-center gap-3 text-center">
+          <div className="flex items-center gap-2">
+            {["bg-red-500", "bg-blue-500", "bg-green-500"].map((c) => (
+              <span key={c} className={`h-3.5 w-3.5 rounded-full shadow-sm ${c}`} />
+            ))}
+          </div>
+          <h1 className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent sm:text-5xl">
             Sequence
           </h1>
-          <p className="text-sm text-zinc-500">Play the classic board game online with friends.</p>
+          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+            Play the classic board game online with friends — no downloads, no accounts.
+          </p>
         </div>
-        <OnlinePlayPanel />
+
+        <div className="relative w-full max-w-md">
+          <OnlinePlayPanel />
+        </div>
+
         <button
           type="button"
           onClick={() => setShowOnlinePanel(false)}
-          className="text-sm text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
+          className="relative text-sm text-zinc-500 underline underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-400"
         >
           Practice locally instead
         </button>

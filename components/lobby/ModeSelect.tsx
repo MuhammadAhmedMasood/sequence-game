@@ -21,16 +21,16 @@ export default function ModeSelect({ value, onChange }: ModeSelectProps) {
           key={mode.value}
           type="button"
           onClick={() => onChange(mode.value)}
-          className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 text-center transition ${
+          className={`flex flex-col items-center gap-0.5 rounded-xl border-2 px-2 py-2 text-center transition ${
             value === mode.value
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-              : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+              ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
+              : "border-zinc-200 hover:border-indigo-300 dark:border-zinc-700 dark:hover:border-indigo-700"
           }`}
         >
           <span
             className={`text-xs font-semibold ${
               value === mode.value
-                ? "text-blue-700 dark:text-blue-300"
+                ? "text-indigo-700 dark:text-indigo-300"
                 : "text-zinc-700 dark:text-zinc-200"
             }`}
           >

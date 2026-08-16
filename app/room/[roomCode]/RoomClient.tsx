@@ -9,9 +9,9 @@ import { playTurnChime } from "@/lib/audio/chime";
 import { isDeadCard } from "@/lib/game/deadCard";
 import { isJack } from "@/lib/game/jacks";
 import { getPlayableSquares } from "@/lib/game/moves";
-import type { CardInstance, MoveAction, SquareIndex } from "@/lib/game/types";
+import type { CardInstance, MoveAction, SquareIndex, Team } from "@/lib/game/types";
 import { supabase } from "@/lib/supabase/client";
-import { startGame } from "@/lib/supabase/queries";
+import { setTeam, startGame } from "@/lib/supabase/queries";
 
 interface RoomClientProps {
   roomCode: string;
@@ -92,6 +92,13 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
     selectedCard && game ? isDeadCard(selectedCard, game.board_chips) : false;
 
   const isMyTurn = !!(game && myPlayer && game.current_seat_index === myPlayer.seatIndex);
+  const currentTurnPlayer = players.find((p) => p.seatIndex === game?.current_seat_index);
+  const turnLabel =
+    game?.mode === "two-team" && currentTurnPlayer
+      ? `Team ${currentTurnPlayer.team}'s turn (${currentTurnPlayer.displayName})`
+      : currentTurnPlayer
+        ? `${currentTurnPlayer.displayName}'s turn`
+        : "Waiting for opponent…";
 
   // Chimes once on the moment it *becomes* your turn (including the very
   // first turn of the game) — not on every render while it stays your
@@ -153,6 +160,13 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
     setSelectedInstanceId(null);
   }
 
+  function handleSetTeam(team: Team) {
+    if (!myPlayerId) return;
+    setTeam(myPlayerId, team).catch((e) => {
+      console.error("Failed to switch team", e);
+    });
+  }
+
   async function handleStart() {
     if (!game) return;
     setStarting(true);
@@ -165,12 +179,14 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
 
   if (lookupError) {
     return (
-      <main className="flex h-dvh items-center justify-center text-zinc-500">{lookupError}</main>
+      <main className="flex h-dvh items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-zinc-500 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+        {lookupError}
+      </main>
     );
   }
   if (loading || !game) {
     return (
-      <main className="flex h-dvh items-center justify-center text-zinc-500">
+      <main className="flex h-dvh items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-zinc-500 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
         Loading room {roomCode}…
       </main>
     );
@@ -183,6 +199,8 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
         mode={game.mode}
         players={players}
         isHost={isHost}
+        myPlayerId={myPlayerId}
+        onSetTeam={handleSetTeam}
         hintsDraft={hintsDraft}
         onHintsChange={setHintsDraft}
         onStart={handleStart}
@@ -192,28 +210,32 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   }
 
   return (
-    <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden p-2 sm:p-4">
-      <div className="flex w-full max-w-4xl shrink-0 items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight">Room {game.room_code}</h1>
+    <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-2 sm:p-4 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+      <div className="flex w-full max-w-4xl shrink-0 items-center justify-between gap-2">
+        <h1 className="text-base font-semibold tracking-tight text-zinc-800 sm:text-lg dark:text-zinc-100">
+          Room <span className="font-mono">{game.room_code}</span>
+        </h1>
         {game.winner ? (
-          <span className="text-sm font-medium text-zinc-500">Game over</span>
+          <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Game over</span>
         ) : isMyTurn ? (
-          <span className="animate-pulse rounded-full bg-emerald-500 px-3 py-1 text-sm font-bold text-white shadow-sm">
+          <span className="animate-pulse rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 text-xs font-bold text-white shadow-sm sm:text-sm">
             Your turn!
           </span>
         ) : (
-          <span className="text-sm font-medium text-zinc-500">Waiting for other player…</span>
+          <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-500 sm:text-sm dark:bg-zinc-800 dark:text-zinc-400">
+            {turnLabel}
+          </span>
         )}
       </div>
 
       {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
 
       {game.winner ? (
-        <div className="shrink-0 rounded bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        <div className="shrink-0 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-400 px-3 py-1 text-sm font-semibold text-amber-950 shadow-sm">
           {winningLabel ?? "Someone"} wins!
         </div>
       ) : selectedCardIsDead ? (
-        <div className="flex shrink-0 items-center gap-2 rounded bg-red-100 px-3 py-1 text-sm text-red-800 dark:bg-red-900/40 dark:text-red-200">
+        <div className="flex shrink-0 items-center gap-2 rounded-lg bg-red-100 px-3 py-1 text-sm text-red-800 dark:bg-red-900/40 dark:text-red-200">
           This card is dead.
           <button
             type="button"
@@ -234,7 +256,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
           onSquareClick={handleSquareClick}
         />
 
-        <div className="hidden w-44 shrink-0 flex-col gap-3 self-center rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600 shadow-sm lg:flex dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        <div className="hidden w-44 shrink-0 flex-col gap-3 self-center rounded-xl border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 shadow-sm backdrop-blur-sm lg:flex dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
           <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Jack cards</p>
           <div className="flex items-start gap-2">
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[0.65rem] font-bold text-white">
@@ -251,7 +273,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl shrink-0">
+      <div className="w-full max-w-4xl shrink-0 rounded-2xl border border-white/60 bg-white/70 p-2 shadow-sm backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/70">
         <Hand
           cards={myHand}
           selectedInstanceId={selectedInstanceId}

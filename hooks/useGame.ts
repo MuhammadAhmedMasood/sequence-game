@@ -151,6 +151,22 @@ export function useGame(gameId: string | null): UseGameResult {
           );
         },
       )
+      // UPDATE (not just INSERT): the lobby's team picker lets other
+      // players change team/chip_color and deal_game reseats everyone's
+      // seat_index — every seated player needs to see those live too, not
+      // just newly-joining ones.
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
+        (payload) => {
+          const row = payload.new as PlayerRow;
+          setPlayers((prev) =>
+            prev
+              .map((p) => (p.id === row.id ? toPlayerMeta(row) : p))
+              .sort((a, b) => a.seatIndex - b.seatIndex),
+          );
+        },
+      )
       .subscribe();
 
     return () => {

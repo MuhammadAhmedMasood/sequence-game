@@ -99,6 +99,17 @@ drop policy if exists "join as self" on players;
 create policy "join as self" on players for insert
   with check (auth_user_id = auth.uid());
 
+-- Lets a player change their own team (2v2 team picker) only before the
+-- game starts — seat_index/turn order gets finalized by deal_game once
+-- it does, so team changes afterward would silently desync from it.
+drop policy if exists "update own player before start" on players;
+create policy "update own player before start" on players for update
+  using (
+    auth_user_id = auth.uid()
+    and exists (select 1 from games g where g.id = players.game_id and g.status = 'lobby')
+  )
+  with check (auth_user_id = auth.uid());
+
 -- Only the seated player whose turn it currently is may update the game
 -- row — this is the RLS-enforced turn-order check. The explicit
 -- `with check (true)` matters: without it, Postgres reuses the USING
@@ -157,6 +168,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_mode text;
   v_hand_size int;
   v_player record;
   v_deck jsonb[];
@@ -175,9 +187,44 @@ begin
     raise exception 'not a player in this game';
   end if;
 
-  select hand_size into v_hand_size from games where id = p_game_id;
+  select mode, hand_size into v_mode, v_hand_size from games where id = p_game_id;
   if v_hand_size is null then
     raise exception 'game not found';
+  end if;
+
+  -- Team mode: seats have to alternate TeamA/TeamB for turn order, but the
+  -- lobby's team picker lets players freely switch teams right up until
+  -- start, so seat_index (assigned at join time) can no longer be trusted
+  -- to reflect that alternation. Recompute it here from each player's
+  -- final team choice, in join order within each team.
+  if v_mode = 'two-team' then
+    if (select count(*) from players where game_id = p_game_id and team = 'A') <> 2
+      or (select count(*) from players where game_id = p_game_id and team = 'B') <> 2
+    then
+      raise exception 'each team needs exactly 2 players';
+    end if;
+
+    -- Two-phase update: reassigning seat_index directly risks transiently
+    -- colliding with another row's current value under the
+    -- (game_id, seat_index) unique constraint. Landing everyone on a
+    -- guaranteed-distinct negative value first, then flipping to the
+    -- final positive value, avoids that regardless of ordering.
+    with team_a as (
+      select id, row_number() over (order by joined_at) - 1 as rn
+      from players where game_id = p_game_id and team = 'A'
+    ), team_b as (
+      select id, row_number() over (order by joined_at) - 1 as rn
+      from players where game_id = p_game_id and team = 'B'
+    ), combined as (
+      select id, (rn * 2)::int as new_seat from team_a
+      union all
+      select id, (rn * 2 + 1)::int as new_seat from team_b
+    )
+    update players p set seat_index = -1 - c.new_seat
+    from combined c where c.id = p.id;
+
+    update players set seat_index = -1 - seat_index
+    where game_id = p_game_id and seat_index < 0;
   end if;
 
   v_deck := array[]::jsonb[];
