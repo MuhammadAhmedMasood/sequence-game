@@ -166,6 +166,11 @@ export default function Home() {
     [selectedTargets],
   );
 
+  const sequencedSquares = useMemo<Set<SquareIndex>>(
+    () => new Set(game?.sequences.flatMap((s) => s.squares) ?? []),
+    [game?.sequences],
+  );
+
   // Jacks are excluded from the ambient hint highlight: a two-eyed jack
   // matches every open square, so including it would flood the whole
   // board green. Its own squares still show up in `selectedSquares` once
@@ -495,6 +500,7 @@ export default function Home() {
           chips={activeGame.board}
           selectedSquares={selectedSquares}
           hintSquares={hintSquares}
+          sequencedSquares={sequencedSquares}
           onSquareClick={handleSquareClick}
         />
 

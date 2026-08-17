@@ -416,6 +416,57 @@ begin
 end;
 $$;
 
+-- Swaps two players' teams (and derived chip colors) atomically. Needed
+-- because once both team columns hold 2/2, there's no empty slot left for
+-- "update own player before start" to move a player into — the only way
+-- to change sides at that point is trading places with someone on the
+-- other team, which means writing a row that isn't the caller's own, so
+-- it can't be done as a plain RLS-gated UPDATE like setTeam's move-into-an-
+-- empty-slot case. Callable only by one of the two players being swapped,
+-- and only while the game is still in the lobby.
+create or replace function swap_player_team(p_player_id uuid, p_other_player_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_game_id uuid;
+  v_my_team text;
+  v_other_game_id uuid;
+  v_other_team text;
+begin
+  select game_id, team into v_game_id, v_my_team
+  from players
+  where id = p_player_id and auth_user_id = auth.uid();
+
+  if v_game_id is null then
+    raise exception 'not your player';
+  end if;
+
+  select game_id, team into v_other_game_id, v_other_team
+  from players where id = p_other_player_id;
+
+  if v_other_game_id is null or v_other_game_id <> v_game_id then
+    raise exception 'other player not in this game';
+  end if;
+
+  if not exists (select 1 from games where id = v_game_id and status = 'lobby') then
+    raise exception 'game already started';
+  end if;
+
+  update players
+  set team = v_other_team,
+      chip_color = case v_other_team when 'A' then 'red' when 'B' then 'blue' else chip_color end
+  where id = p_player_id;
+
+  update players
+  set team = v_my_team,
+      chip_color = case v_my_team when 'A' then 'red' when 'B' then 'blue' else chip_color end
+  where id = p_other_player_id;
+end;
+$$;
+
 -- Enable Realtime broadcasts (Postgres Changes) for these tables. Easy to
 -- forget: RLS alone doesn't make row changes stream to clients — the
 -- table also has to be added to the supabase_realtime publication.

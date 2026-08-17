@@ -13,7 +13,7 @@ import { isJack } from "@/lib/game/jacks";
 import { getPlayableSquares } from "@/lib/game/moves";
 import type { CardInstance, ChipColor, MoveAction, SquareIndex, Team } from "@/lib/game/types";
 import { supabase } from "@/lib/supabase/client";
-import { rematchGame, setTeam, startGame } from "@/lib/supabase/queries";
+import { rematchGame, setTeam, startGame, swapPlayerTeams } from "@/lib/supabase/queries";
 
 interface RoomClientProps {
   roomCode: string;
@@ -88,6 +88,11 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   const selectedSquares = useMemo(
     () => new Set<SquareIndex>(selectedTargets?.squares ?? []),
     [selectedTargets],
+  );
+
+  const sequencedSquares = useMemo(
+    () => new Set<SquareIndex>(game?.sequences.flatMap((s) => s.squares) ?? []),
+    [game?.sequences],
   );
 
   // Jacks are excluded here for the same reason as the local demo: a
@@ -190,6 +195,13 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
     });
   }
 
+  function handleSwapTeam(otherPlayerId: string) {
+    if (!myPlayerId) return;
+    swapPlayerTeams(myPlayerId, otherPlayerId).catch((e) => {
+      console.error("Failed to swap teams", e);
+    });
+  }
+
   async function handleStart() {
     if (!game) return;
     setStarting(true);
@@ -240,6 +252,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
         isHost={isHost}
         myPlayerId={myPlayerId}
         onSetTeam={handleSetTeam}
+        onSwapTeam={handleSwapTeam}
         hintsDraft={hintsDraft}
         onHintsChange={setHintsDraft}
         sequencesToWinDraft={sequencesToWinDraft}
@@ -348,6 +361,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
           chips={game.board_chips}
           selectedSquares={selectedSquares}
           hintSquares={hintSquares}
+          sequencedSquares={sequencedSquares}
           onSquareClick={handleSquareClick}
         />
 

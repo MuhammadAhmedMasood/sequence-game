@@ -187,6 +187,20 @@ export async function setTeam(playerId: string, team: Team): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// Trades places with another player once both team columns are already
+// 2/2 — at that point there's no empty slot for setTeam to move into, so
+// switching sides means swapping with someone instead. The other player's
+// row isn't the caller's own, so this can't be a plain RLS-gated UPDATE
+// like setTeam; it goes through the swap_player_team RPC, which checks the
+// caller owns playerId and both players are still in the same lobby.
+export async function swapPlayerTeams(playerId: string, otherPlayerId: string): Promise<void> {
+  const { error } = await supabase.rpc("swap_player_team", {
+    p_player_id: playerId,
+    p_other_player_id: otherPlayerId,
+  });
+  if (error) throw new Error(error.message);
+}
+
 // hintsEnabled and sequencesToWin are whole-game settings the host picks
 // once, here — every player sees the same values for the rest of the
 // game (see RoomClient.tsx). sequencesToWin overrides the per-mode

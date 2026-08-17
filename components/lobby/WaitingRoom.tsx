@@ -10,6 +10,7 @@ interface WaitingRoomProps {
   isHost: boolean;
   myPlayerId: PlayerId | null;
   onSetTeam: (team: Team) => void;
+  onSwapTeam: (otherPlayerId: PlayerId) => void;
   hintsDraft: boolean;
   onHintsChange: (value: boolean) => void;
   sequencesToWinDraft: number;
@@ -56,6 +57,7 @@ interface TeamColumnsProps {
   players: PlayerMeta[];
   myPlayerId: PlayerId | null;
   onSetTeam: (team: Team) => void;
+  onSwapTeam: (otherPlayerId: PlayerId) => void;
 }
 
 // Drag-and-drop is self-only: a player can pick up and move their own
@@ -67,9 +69,16 @@ interface TeamColumnsProps {
 // specifically so the same handlers work for both mouse and touch —
 // native HTML5 DnD doesn't fire from touchscreens on most mobile
 // browsers, and this app has to be draggable on a phone too.
-function TeamColumns({ players, myPlayerId, onSetTeam }: TeamColumnsProps) {
+//
+// Once both columns hold 2/2 (the normal state once all 4 seats are
+// taken), there's no empty slot left to move into — dropping on the
+// other column would always be a no-op. Dropping directly onto one of
+// its occupants instead trades places with them (swap_player_team),
+// which is why hover tracks a specific player row, not just a column.
+function TeamColumns({ players, myPlayerId, onSetTeam, onSwapTeam }: TeamColumnsProps) {
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [hoverTeam, setHoverTeam] = useState<Team | null>(null);
+  const [hoverPlayerId, setHoverPlayerId] = useState<PlayerId | null>(null);
 
   const myPlayer = players.find((p) => p.id === myPlayerId);
   const dragging = dragPos !== null && myPlayer !== undefined;
@@ -82,6 +91,12 @@ function TeamColumns({ players, myPlayerId, onSetTeam }: TeamColumnsProps) {
     return !!myPlayer && team !== myPlayer.team && teamCount(team) < 2;
   }
 
+  function canSwapWith(otherPlayerId: PlayerId) {
+    if (!myPlayer || otherPlayerId === myPlayerId) return false;
+    const other = players.find((p) => p.id === otherPlayerId);
+    return !!other && other.team !== myPlayer.team;
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!myPlayer) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -92,22 +107,32 @@ function TeamColumns({ players, myPlayerId, onSetTeam }: TeamColumnsProps) {
     if (!dragging) return;
     setDragPos({ x: e.clientX, y: e.clientY });
     const el = document.elementFromPoint(e.clientX, e.clientY);
+    const row = el?.closest<HTMLElement>("[data-player-row]");
+    if (row?.dataset.playerId && canSwapWith(row.dataset.playerId)) {
+      setHoverPlayerId(row.dataset.playerId);
+      setHoverTeam(null);
+      return;
+    }
+    setHoverPlayerId(null);
     const column = el?.closest<HTMLElement>("[data-team-column]");
     setHoverTeam((column?.dataset.team as Team) ?? null);
   }
 
   function endDrag() {
-    if (dragging && hoverTeam && canDropOn(hoverTeam)) {
+    if (dragging && hoverPlayerId && canSwapWith(hoverPlayerId)) {
+      onSwapTeam(hoverPlayerId);
+    } else if (dragging && hoverTeam && canDropOn(hoverTeam)) {
       onSetTeam(hoverTeam);
     }
     setDragPos(null);
     setHoverTeam(null);
+    setHoverPlayerId(null);
   }
 
   return (
     <div className="flex w-full flex-col gap-2">
       <p className="text-center text-xs font-medium text-zinc-500 dark:text-zinc-400">
-        {myPlayer ? "Drag your name into a team" : "Teams"}
+        {myPlayer ? "Drag your name into a team, or onto a player to swap" : "Teams"}
       </p>
       <div className="grid grid-cols-2 gap-2">
         {(["A", "B"] as const).map((team) => {
@@ -141,9 +166,12 @@ function TeamColumns({ players, myPlayerId, onSetTeam }: TeamColumnsProps) {
                 }
                 const isMe = p.id === myPlayerId;
                 const isBeingDragged = isMe && dragging;
+                const isSwapTarget = hoverPlayerId === p.id;
                 return (
                   <div
                     key={p.id}
+                    data-player-row
+                    data-player-id={p.id}
                     onPointerDown={isMe ? handlePointerDown : undefined}
                     onPointerMove={isMe ? handlePointerMove : undefined}
                     onPointerUp={isMe ? endDrag : undefined}
@@ -152,7 +180,9 @@ function TeamColumns({ players, myPlayerId, onSetTeam }: TeamColumnsProps) {
                     className={`flex h-10 items-center gap-2 rounded-lg border px-2 text-sm select-none ${
                       isMe
                         ? "cursor-grab border-indigo-300 bg-indigo-50 active:cursor-grabbing dark:border-indigo-700 dark:bg-indigo-950"
-                        : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800"
+                        : isSwapTarget
+                          ? "border-indigo-400 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/40"
+                          : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800"
                     } ${isBeingDragged ? "opacity-30" : ""}`}
                   >
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${CHIP_DOT_CLASSES[p.chipColor]}`} />
@@ -168,6 +198,11 @@ function TeamColumns({ players, myPlayerId, onSetTeam }: TeamColumnsProps) {
                     {isMe ? (
                       <span className="shrink-0 text-zinc-400" aria-hidden>
                         ⠿
+                      </span>
+                    ) : null}
+                    {isSwapTarget ? (
+                      <span className="shrink-0 text-indigo-500 dark:text-indigo-400" aria-hidden>
+                        ⇄
                       </span>
                     ) : null}
                   </div>
@@ -205,6 +240,7 @@ export default function WaitingRoom({
   isHost,
   myPlayerId,
   onSetTeam,
+  onSwapTeam,
   hintsDraft,
   onHintsChange,
   sequencesToWinDraft,
@@ -275,7 +311,12 @@ export default function WaitingRoom({
           </div>
 
           {mode === "two-team" ? (
-            <TeamColumns players={players} myPlayerId={myPlayerId} onSetTeam={onSetTeam} />
+            <TeamColumns
+              players={players}
+              myPlayerId={myPlayerId}
+              onSetTeam={onSetTeam}
+              onSwapTeam={onSwapTeam}
+            />
           ) : (
             <ul className="flex flex-col gap-1.5 rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
               {players.map((p, i) => (

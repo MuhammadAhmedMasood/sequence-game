@@ -6,6 +6,10 @@ interface BoardProps {
   chips: BoardChips;
   selectedSquares: ReadonlySet<SquareIndex>;
   hintSquares: ReadonlySet<SquareIndex>;
+  // Squares that belong to at least one already-completed sequence — chips
+  // there render dulled with a strike, so a finished sequence stays visible
+  // as "spent" without needing a separate overlay layer on top of the grid.
+  sequencedSquares: ReadonlySet<SquareIndex>;
   onSquareClick: (index: SquareIndex) => void;
 }
 
@@ -13,6 +17,7 @@ export default function Board({
   chips,
   selectedSquares,
   hintSquares,
+  sequencedSquares,
   onSquareClick,
 }: BoardProps) {
   return (
@@ -24,6 +29,7 @@ export default function Board({
           chip={chips[square.index]}
           selected={selectedSquares.has(square.index)}
           hinted={hintSquares.has(square.index)}
+          inSequence={sequencedSquares.has(square.index)}
           onClick={() => onSquareClick(square.index)}
         />
       ))}

@@ -24,6 +24,8 @@ interface BoardSquareProps {
   // Weak highlight: hints are on and this square matches *some* card in the
   // player's hand (not necessarily the selected one).
   hinted: boolean;
+  // This square's chip is part of an already-completed sequence.
+  inSequence: boolean;
   onClick: () => void;
 }
 
@@ -32,6 +34,7 @@ export default function BoardSquare({
   chip,
   selected,
   hinted,
+  inSequence,
   onClick,
 }: BoardSquareProps) {
   const isRed = square.kind === "card" && RED_SUITS.has(square.card.suit);
@@ -71,8 +74,17 @@ export default function BoardSquare({
       )}
       {chip ? (
         <span
-          className={`absolute inset-1 rounded-full opacity-90 ${CHIP_CLASSES[chip]}`}
-        />
+          className={`absolute inset-1 rounded-full ${CHIP_CLASSES[chip]} ${
+            inSequence ? "opacity-55" : "opacity-90"
+          }`}
+        >
+          {inSequence ? (
+            <span
+              aria-hidden
+              className="absolute left-1/2 top-1/2 h-[2px] w-[80%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-full bg-white/80"
+            />
+          ) : null}
+        </span>
       ) : null}
     </button>
   );

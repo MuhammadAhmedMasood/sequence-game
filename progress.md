@@ -59,6 +59,18 @@ pointing at the `sequence-game-steel.vercel.app` deployment) — see
     setup, tech stack, and an annotated project structure + design-notes
     section for anyone reading the code. Also links the live deployment
     (`sequence.dizzlerai.com`) prominently at the top.
+13. **2v2 team swap fix + completed-sequence chip styling** — reported
+    live: once all 4 seats in a 2v2 lobby were filled (2/2 per team),
+    there was no empty slot left to drag into, so switching sides was
+    impossible. Fixed with a new `swap_player_team` RPC (see "Hard-won
+    bugs" #11) that trades two players' teams atomically; dropping your
+    name directly onto an opponent-team player now swaps with them
+    (⇄ indicator on hover), on top of the existing move-into-an-empty-slot
+    behavior. Also added: chips that are part of an already-completed
+    sequence now render dulled (55% opacity) with a diagonal white
+    strike, in both the live board and the local hot-seat board — purely
+    visual, `sequencedSquares` threaded down from `game.sequences`/
+    `activeGame.sequences` into `Board`/`BoardSquare`.
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -104,8 +116,8 @@ Pushed to GitHub — see "Repository" below.
   between the local hot-seat demo and the live Supabase-backed game.
 - `lib/supabase/` — `client.ts` (browser client, session in `localStorage` so
   identity survives closed tabs/crashes — tradeoff: two tabs in one browser
-  share one identity), `queries.ts` (createRoom, joinRoom, setTeam, startGame,
-  rematchGame), `types.ts` (DB row shapes).
+  share one identity), `queries.ts` (createRoom, joinRoom, setTeam,
+  swapPlayerTeams, startGame, rematchGame), `types.ts` (DB row shapes).
 - `hooks/useGame.ts` — the live-game data hook. Subscribes to Realtime
   Postgres Changes for `games`/`players`/`hands`, does optimistic local
   updates on every move, and layers several resilience mechanisms on top
@@ -124,9 +136,9 @@ Pushed to GitHub — see "Repository" below.
 - `components/game/Scoreboard.tsx` — per-player/per-team sequence-progress
   panel (sidebar on desktop, compact pill bar on mobile).
 - `supabase/schema.sql` — full schema: `games`, `players`, `hands` (secret),
-  `decks` (secret, no client access at all), `moves`; RLS policies; three
+  `decks` (secret, no client access at all), `moves`; RLS policies; four
   `SECURITY DEFINER` RPCs (`deal_game`, `play_card_and_draw`,
-  `rematch_game`). This file is the source of truth — always apply changes
+  `rematch_game`, `swap_player_team`). This file is the source of truth — always apply changes
   here to the live Supabase project too via the SQL Editor. `games.winner`
   is `text[]`, not a single value: `null` = not over, `[]` = draw, 1+
   colors = win (more than one is a tie for the lead at a stalemate — see
@@ -159,7 +171,8 @@ for a casual game among friends; avoids standing up an Edge Function layer.
   sequences-to-win (1 or 2, default 2), start game.
 - 2v2 team assignment via drag-and-drop (self-only — a player can drag their
   own name between Team A/B columns, not anyone else's; see "Decisions" below
-  for why).
+  for why), including swapping places with an opponent once both columns are
+  already full (drop your name directly onto them instead of an empty slot).
 - Full board/hand UI with authentic jack card art (public-domain Vector
   Playing Cards deck) that correctly draws hearts/spades one-eyed and
   clubs/diamonds two-eyed, matching the wild/anti-wild rule — the jack
@@ -177,6 +190,9 @@ for a casual game among friends; avoids standing up an Edge Function layer.
   click, not after a network round trip.
 - Win detection: the game ends the instant a player/team reaches
   sequencesToWin, live, for every connected client.
+- Completed sequences are visually distinct on the board: their chips render
+  dulled with a diagonal strike, instead of staying visually identical to an
+  active chip.
 - Game-over screen: "Play again" (host-only, redeals immediately with the
   same lineup) and, in 2v2 only, "Shuffle teams & play again" (back to the
   lobby team picker). "Exit to home" available to everyone.
@@ -316,6 +332,23 @@ These were each non-obvious, verified by direct reproduction, not guessed:
     deck.test.ts`): 8 jacks (4 one-eyed, 4 two-eyed) and exactly 2 of
     every other card. No game logic changed — this was a verification
     pass, not a fix.
+11. **2v2 team swap was impossible once the lobby was full**: `setTeam`
+    (a plain RLS-gated `UPDATE ... WHERE id = <own player>`) only ever
+    moves a player into an empty slot in the other team's column —
+    `canDropOn` requires `teamCount(team) < 2`. That's fine while the
+    lobby is still filling up, but the *normal* end state once all 4
+    seats are taken is both columns at 2/2, so there is never an empty
+    slot to move into again — switching sides silently stopped working
+    exactly when players would actually want to use it (after everyone's
+    joined). The fix isn't a bigger `canDropOn` — a genuine swap has to
+    write *two* players' rows in one transaction, and the second row
+    isn't the caller's own, so plain RLS can't allow it without loosening
+    the policy to "any seated player can rewrite any other player's row."
+    Added `swap_player_team`, a `SECURITY DEFINER` RPC that verifies the
+    caller owns one side of the swap, both players share a game still in
+    `lobby`, then flips both rows' `team`/`chip_color` together. Dropping
+    your name directly onto an occupant of the other column now triggers
+    this instead of the empty-slot `setTeam` path.
 
 ## Decisions worth knowing about
 
@@ -350,6 +383,17 @@ These were each non-obvious, verified by direct reproduction, not guessed:
   mismatches) after a long session with many HMR reloads, a clean restart
   (`kill` the process, `npm run dev` again) has resolved it more than once —
   worth trying before assuming a real bug.
+- Typing multi-line SQL directly into the Supabase SQL Editor (Monaco) via
+  browser automation is unreliable: its autocomplete widget can eat the
+  Enter keypress meant to insert a newline (accepting a suggestion instead),
+  silently corrupting the query — and once, losing editor focus entirely
+  mid-type caused the typed characters to be interpreted as dashboard
+  keyboard shortcuts instead, navigating away from the SQL Editor. Safer:
+  write the statement as a single line (SQL doesn't care about newlines
+  outside string literals/`--` comments) and click directly into the editor
+  body immediately before typing. `navigator.clipboard.writeText` from the
+  page's own JS console also isn't reliable there ("Document is not
+  focused") — don't rely on clipboard paste as the primary path.
 
 ## Not yet done / explicitly out of scope so far
 
