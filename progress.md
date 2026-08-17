@@ -19,7 +19,7 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
 ## Status: all 5 original milestones complete, plus a polish/fixes round
 
 1. **Static board + hand UI** — done
-2. **Pure game-logic module + unit tests** — done, 97 tests passing
+2. **Pure game-logic module + unit tests** — done, 102 tests passing
 3. **Supabase integration (live multiplayer)** — done
 4. **Full flow** (landing → lobby → live game) — done
 5. **Polish** (visuals, mobile, score tally, win/rematch) — done
@@ -42,6 +42,16 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
     wild/anti-wild rule. The W/R badge overlay is gone — the art itself
     now reliably conveys it, and the jack legend shows real card
     thumbnails instead of colored circles. See `public/cards/LICENSE.md`.
+11. **Deck composition + jack-caused dead-card audit** — verified, not a
+    bug: exactly 8 jacks (4 one-eyed, 4 two-eyed) and exactly 2 of every
+    other card (`lib/game/__tests__/deck.test.ts`), and the tricky case
+    of a two-eyed jack "spending" one of a card's two board squares —
+    later leaving any physical copy of that same card dead, even though
+    neither copy was ever placed itself — was already correct by
+    construction (`isDeadCard` only looks at current square occupancy,
+    never at what put a chip there — confirmed against the official
+    rules too). Added explicit regression tests for it (see "Hard-won
+    bugs" #10 for the reasoning) rather than changing any logic.
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -266,6 +276,25 @@ These were each non-obvious, verified by direct reproduction, not guessed:
    end-to-end check against the migrated production DB (SQL-set a room
    to `completed`/`winner: ["red"]`, confirmed the UI rendered "X wins!"
    correctly).
+10. **Not a bug, but worth recording**: a two-eyed jack can "spend" one
+    of a card's two board squares without ever using that card itself —
+    e.g. a wild jack fills one of 5♠'s two squares, someone else's real
+    5♠ fills the other, and now the *other physical copy* of 5♠ (from
+    the double deck) is dead the moment anyone draws it, despite neither
+    copy ever having touched the board together. This turns out to
+    already be exactly correct: `isDeadCard` only ever looks at current
+    square occupancy, never at what put a chip there, so it doesn't need
+    to know or care that a jack was involved — confirmed this matches
+    the official rule (dead card = "both spaces... covered by a marker
+    chip", no jack exception) and added explicit regression tests
+    (`lib/game/__tests__/deadCard.test.ts`) covering: a jack filling only
+    one square (not yet dead), both squares filled entirely by jacks
+    (dead, swap valid, normal placement rejected), and a one-eyed jack
+    removing one of those chips reviving the card. Also added a test
+    locking in the exact deck composition (`lib/game/__tests__/
+    deck.test.ts`): 8 jacks (4 one-eyed, 4 two-eyed) and exactly 2 of
+    every other card. No game logic changed — this was a verification
+    pass, not a fix.
 
 ## Decisions worth knowing about
 
@@ -285,7 +314,7 @@ These were each non-obvious, verified by direct reproduction, not guessed:
 
 ## Testing notes for future sessions
 
-- `npm run test` (Vitest) covers all of `lib/game/` — 97 tests, keep green.
+- `npm run test` (Vitest) covers all of `lib/game/` — 102 tests, keep green.
 - For manual multiplayer testing without two real browser identities: insert
   a second/third player row directly via the Supabase SQL Editor (bypasses
   RLS as the `postgres` role) rather than trying to fake a second session in

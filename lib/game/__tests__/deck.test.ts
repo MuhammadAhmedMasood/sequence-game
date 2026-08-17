@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDeck, shuffle } from "../deck";
+import { isOneEyedJack, isTwoEyedJack } from "../jacks";
 
 describe("buildDeck", () => {
   it("builds 104 cards (two 52-card decks, no jokers)", () => {
@@ -21,6 +22,18 @@ describe("buildDeck", () => {
   it("gives every card instance a unique instanceId", () => {
     const ids = buildDeck().map((c) => c.instanceId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("has exactly 8 jacks: 4 one-eyed (hearts/spades) and 4 two-eyed (clubs/diamonds)", () => {
+    const jacks = buildDeck().filter((c) => c.rank === "J");
+    expect(jacks).toHaveLength(8);
+    expect(jacks.filter(isOneEyedJack)).toHaveLength(4);
+    expect(jacks.filter(isTwoEyedJack)).toHaveLength(4);
+  });
+
+  it("has exactly 2 copies of every non-jack rank/suit combo (e.g. 5 of spades)", () => {
+    const fiveOfSpades = buildDeck().filter((c) => c.rank === "5" && c.suit === "spades");
+    expect(fiveOfSpades).toHaveLength(2);
   });
 });
 
