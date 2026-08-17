@@ -35,6 +35,13 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
    deck ran out; done (see "Hard-won bugs" #9). Required a live schema
    migration (`games.winner` widened from `text` to `text[]`), already
    applied to the hosted Supabase project.
+10. **Authentic one-eyed/two-eyed jack artwork** — replaced all 4 jack
+    images with Byron Knoll's public-domain "Vector Playing Cards" deck,
+    which correctly draws hearts/spades in profile (one eye) and
+    clubs/diamonds facing forward (both eyes), matching the game's own
+    wild/anti-wild rule. The W/R badge overlay is gone — the art itself
+    now reliably conveys it, and the jack legend shows real card
+    thumbnails instead of colored circles. See `public/cards/LICENSE.md`.
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -122,9 +129,10 @@ for a casual game among friends; avoids standing up an Edge Function layer.
 - 2v2 team assignment via drag-and-drop (self-only — a player can drag their
   own name between Team A/B columns, not anyone else's; see "Decisions" below
   for why).
-- Full board/hand UI with authentic jack card art (LGPL SVG-Cards deck) and a
-  W/R badge legend (two-eyed jack = wild, one-eyed = anti-wild) since the
-  deck's art doesn't reliably distinguish them at a glance.
+- Full board/hand UI with authentic jack card art (public-domain Vector
+  Playing Cards deck) that correctly draws hearts/spades one-eyed and
+  clubs/diamonds two-eyed, matching the wild/anti-wild rule — the jack
+  legend shows real card thumbnails, no badge overlay needed.
 - Hints mode: highlights every square the current player could legally play,
   excluding jacks (a two-eyed jack matches every open square, which would
   flood the board). Defaults on.

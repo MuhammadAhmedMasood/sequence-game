@@ -363,16 +363,14 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
           <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 shadow-sm backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
             <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Jack cards</p>
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[0.65rem] font-bold text-white">
-                W
-              </span>
-              <span>Wild — place a chip on any open square</span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG */}
+              <img src="/cards/jack-clubs.svg" alt="Two-eyed jack" className="mt-0.5 h-9 w-auto shrink-0 rounded border border-zinc-200 dark:border-zinc-700" />
+              <span>Two-eyed jack (both eyes) — wild, place anywhere</span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-[0.65rem] font-bold text-white">
-                R
-              </span>
-              <span>Anti-wild — remove one opponent chip</span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG */}
+              <img src="/cards/jack-hearts.svg" alt="One-eyed jack" className="mt-0.5 h-9 w-auto shrink-0 rounded border border-zinc-200 dark:border-zinc-700" />
+              <span>One-eyed jack (profile) — anti-wild, remove one opponent chip</span>
             </div>
           </div>
         </div>

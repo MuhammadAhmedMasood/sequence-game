@@ -1,4 +1,4 @@
-import { isJack, isTwoEyedJack } from "@/lib/game/jacks";
+import { isJack, isOneEyedJack } from "@/lib/game/jacks";
 import type { Card as CardType } from "@/lib/game/types";
 
 const SUIT_SYMBOLS: Record<CardType["suit"], string> = {
@@ -12,9 +12,14 @@ const SUIT_SYMBOLS: Record<CardType["suit"], string> = {
 const RED_SUITS: ReadonlySet<CardType["suit"]> = new Set(["hearts", "diamonds"]);
 
 // Real card artwork (not a stylized drawing) — see public/cards/LICENSE.md
-// for source and license (LGPL-2.1+, David Bellot / Huub de Beer's
-// SVG-Cards deck). Each file already includes its own corner index marks,
-// so the card face here doesn't draw its own rank/suit text over it.
+// for source and license (public domain, Byron Knoll's Vector Playing
+// Cards deck). This deck follows the traditional English/Bicycle pattern,
+// where hearts and spades are drawn in full profile (one eye visible) and
+// clubs and diamonds face forward (both eyes visible) — matching
+// isTwoEyedJack/isOneEyedJack in lib/game/jacks.ts exactly, so the eye
+// count in the artwork itself now reliably conveys wild vs. anti-wild
+// with no badge needed. Each file already includes its own corner index
+// marks, so the card face here doesn't draw its own rank/suit text over it.
 const JACK_IMAGES: Record<CardType["suit"], string> = {
   clubs: "/cards/jack-clubs.svg",
   diamonds: "/cards/jack-diamonds.svg",
@@ -32,17 +37,14 @@ export default function Card({ card, selected = false, onClick }: CardProps) {
   const isRed = RED_SUITS.has(card.suit);
 
   if (isJack(card)) {
-    // This particular deck's art doesn't consistently draw one-eyed suits
-    // in profile (only diamonds actually is), so eye count in the artwork
-    // can't be relied on to convey wild vs. anti-wild — hence the badge.
-    const wild = isTwoEyedJack(card);
+    const isOneEyed = isOneEyedJack(card);
 
     return (
       <button
         type="button"
         onClick={onClick}
-        title={wild ? "Two-eyed jack — wild, place anywhere" : "One-eyed jack — remove an opponent's chip"}
-        className={`relative flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 bg-white shadow-sm transition-transform hover:-translate-y-1 sm:h-20 sm:w-14 ${
+        title={isOneEyed ? "One-eyed jack — remove an opponent's chip" : "Two-eyed jack — wild, place anywhere"}
+        className={`flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 bg-white shadow-sm transition-transform hover:-translate-y-1 sm:h-20 sm:w-14 ${
           selected ? "border-blue-500 ring-2 ring-blue-300" : "border-zinc-300"
         }`}
       >
@@ -52,13 +54,6 @@ export default function Card({ card, selected = false, onClick }: CardProps) {
           alt={`Jack of ${card.suit}`}
           className="h-full w-full object-contain"
         />
-        <span
-          className={`absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[0.5rem] font-bold text-white sm:h-5 sm:w-5 sm:text-xs ${
-            wild ? "bg-emerald-500" : "bg-rose-500"
-          }`}
-        >
-          {wild ? "W" : "R"}
-        </span>
       </button>
     );
   }
