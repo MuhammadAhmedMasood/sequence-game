@@ -119,6 +119,27 @@ export function getPlayableSquares(
   return { action: "place", squares };
 }
 
+// True if at least one card in `hand` can actually end this player's turn
+// right now (a "place" or "remove-opponent" with a real target square).
+// A dead card never counts here even though a dead-card swap is a legal
+// *action* — swapping only helps if the deck can hand back a replacement,
+// which is exactly the condition callers pair this with (see
+// `resolveStalemateWinners` in winCondition.ts): once the deck is empty,
+// a player whose entire hand is dead has no way to ever produce a
+// playable card again, and the game would otherwise sit frozen on their
+// turn forever.
+export function hasLegalMove(
+  hand: readonly Card[],
+  board: BoardChips,
+  sequenceUsage: Partial<Record<SquareIndex, number>>,
+  actingChipColor: ChipColor,
+): boolean {
+  return hand.some((card) => {
+    const targets = getPlayableSquares(card, board, sequenceUsage, actingChipColor);
+    return !!targets && targets.squares.length > 0;
+  });
+}
+
 export interface ApplyMoveInput {
   board: BoardChips;
   sequences: readonly SequenceRecord[];

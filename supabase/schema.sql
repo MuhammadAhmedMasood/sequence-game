@@ -30,7 +30,12 @@ create table if not exists games (
   deck_count int not null default 0,
   current_seat_index int not null default 0,
   turn_number int not null default 0,
-  winner text,
+  -- null: not over. Empty array: over as a draw. Non-empty: winning
+  -- color(s) — more than one means a tie for the lead at a stalemate
+  -- (deck exhausted with nobody able to move; see resolveStalemateWinners
+  -- in lib/game/winCondition.ts). A plain reach-sequencesToWin win is
+  -- always a single-element array.
+  winner text[],
   -- A host-set, whole-game setting (not a per-client preference): the
   -- host chooses it once before starting, and it applies to every player.
   hints_enabled boolean not null default false,
@@ -40,6 +45,21 @@ create table if not exists games (
 -- Idempotent on an already-existing table (re-running this file against
 -- a project that predates this column just adds it).
 alter table games add column if not exists hints_enabled boolean not null default false;
+
+-- Widens winner from a single color to an array (see the column comment
+-- above). Only touches a project that predates the change — a fresh
+-- `create table` already declares the array type, so this no-ops there.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'games' and column_name = 'winner' and data_type = 'text'
+  ) then
+    alter table games
+      alter column winner type text[]
+      using case when winner is null then null else array[winner] end;
+  end if;
+end $$;
 
 create table if not exists players (
   id uuid primary key default gen_random_uuid(),

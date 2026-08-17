@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { applyMove, validateMove } from "@/lib/game/moves";
-import { checkWinner } from "@/lib/game/winCondition";
+import { applyMove, hasLegalMove, validateMove } from "@/lib/game/moves";
+import { checkWinner, resolveStalemateWinners } from "@/lib/game/winCondition";
 import type {
   CardInstance,
   Move,
@@ -334,8 +334,12 @@ export function useGame(gameId: string | null): UseGameResult {
         });
         // Checked on every placing move: a sequence just completed by this
         // move can immediately satisfy sequencesToWin, and the game has to
-        // end right then rather than waiting for some later check.
-        const winner = checkWinner(players, applied.sequences, game.sequences_to_win);
+        // end right then rather than waiting for some later check. Wrapped
+        // in an array to match `winner`'s shape (see the stalemate-
+        // resolution effect below, which is the only other writer of this
+        // column and can produce more than one color at once).
+        const winnerColor = checkWinner(players, applied.sequences, game.sequences_to_win);
+        const winner = winnerColor ? [winnerColor] : null;
 
         // Optimistic update: apply the chip placement and turn advance
         // locally right away, instead of waiting on the RPC + games UPDATE
@@ -472,6 +476,47 @@ export function useGame(gameId: string | null): UseGameResult {
     },
     [game, players, myPlayerId, myHand],
   );
+
+  // Covers a case RULES.md doesn't spell out: the deck runs dry and the
+  // player whose turn it is has nothing left that can end it — every card
+  // in hand is dead (both squares already covered) and there are no more
+  // cards to draw a replacement from (hasLegalMove, deckCount === 0). Left
+  // alone, the game would just sit frozen on that player's turn forever.
+  // Runs as a reactive effect, not only right after a move, because the
+  // stalemate can just as easily be caused by an *opponent's* move — their
+  // placement can be the one that turns every remaining card in my hand
+  // dead, and I only find that out once it becomes my turn.
+  //
+  // Each client only ever evaluates *its own* hand here, matching the
+  // trust model elsewhere in this file (a client only acts on data it's
+  // legitimately allowed to see) — resolving by writing directly to
+  // `games` is safe because RLS's "update on your turn" policy already
+  // permits exactly this player, and only this player, to do so.
+  //
+  // Whoever has the most completed sequences at that point wins outright;
+  // a tie for the lead is a shared win, and a tie across every player
+  // (resolveStalemateWinners returns []) is a full draw.
+  const resolvingStalemateRef = useRef(false);
+  useEffect(() => {
+    if (!game || game.status !== "in_progress" || game.winner) return;
+    if (game.deck_count > 0) return;
+    const me = players.find((p) => p.id === myPlayerId);
+    if (!me || game.current_seat_index !== me.seatIndex) return;
+    if (submittingRef.current || resolvingStalemateRef.current) return;
+    if (hasLegalMove(myHand, game.board_chips, game.sequence_usage, me.chipColor)) return;
+
+    resolvingStalemateRef.current = true;
+    const winners = resolveStalemateWinners(players, game.sequences);
+    setGame((prev) => (prev ? { ...prev, status: "completed", winner: winners } : prev));
+    supabase
+      .from("games")
+      .update({ status: "completed", winner: winners })
+      .eq("id", game.id)
+      .then(({ error: resolveError }) => {
+        resolvingStalemateRef.current = false;
+        if (resolveError) setError(resolveError.message);
+      });
+  }, [game, players, myHand, myPlayerId]);
 
   return {
     loading,

@@ -11,6 +11,7 @@ import { isJack } from "@/lib/game/jacks";
 import {
   applyMove,
   getPlayableSquares,
+  hasLegalMove,
   validateMove,
 } from "@/lib/game/moves";
 import { buildSeating, type SeatPlayerInput } from "@/lib/game/turnOrder";
@@ -26,7 +27,7 @@ import type {
   SequenceRecord,
   SquareIndex,
 } from "@/lib/game/types";
-import { checkWinner } from "@/lib/game/winCondition";
+import { checkWinner, resolveStalemateWinners } from "@/lib/game/winCondition";
 
 interface ModeConfig {
   handSize: number;
@@ -78,7 +79,9 @@ interface LocalGameState {
   hands: Record<PlayerId, CardInstance[]>;
   currentSeatIndex: number;
   turnNumber: number;
-  winner: ChipColor | null;
+  // null: not over. Empty array: over as a draw. Non-empty: winning
+  // color(s) — more than one means a tie for the lead at a stalemate.
+  winner: ChipColor[] | null;
 }
 
 function createLocalGame(mode: GameMode, sequencesToWin: number): LocalGameState {
@@ -186,11 +189,18 @@ export default function Home() {
   const selectedCardIsDead =
     selectedCard && game ? isDeadCard(selectedCard, game.board) : false;
 
+  // game.winner: null = not over, [] = draw, 1+ colors = win (more than
+  // one means a tie for the lead at a stalemate — see
+  // resolveStalemateWinners in lib/game/winCondition.ts).
   const winningLabel = useMemo(() => {
     if (!game?.winner) return null;
-    const winners = game.players.filter((p) => p.chipColor === game.winner);
-    if (game.mode === "two-team") return `Team ${winners[0]?.team}`;
-    return winners[0]?.displayName ?? "Someone";
+    if (game.winner.length === 0) return "It's a draw!";
+    const winners = game.players.filter((p) => game.winner!.includes(p.chipColor));
+    const names =
+      game.mode === "two-team"
+        ? [...new Set(winners.map((p) => `Team ${p.team}`))]
+        : winners.map((p) => p.displayName);
+    return names.length > 1 ? `${names.join(" & ")} tie!` : `${names[0] ?? "Someone"} wins!`;
   }, [game]);
 
   // Checked before the local-game-readiness guard below: the online panel
@@ -284,12 +294,31 @@ export default function Home() {
     const [drawnCard, ...restDeck] = activeGame.deck;
     const nextHand = drawnCard ? [...handWithoutCard, drawnCard] : handWithoutCard;
     const nextHands = { ...activeGame.hands, [activePlayer.id]: nextHand };
+    const deckAfterMove = drawnCard ? restDeck : activeGame.deck;
 
-    const winner = checkWinner(
+    const winnerColor = checkWinner(
       activeGame.players,
       applied.sequences,
       activeGame.sequencesToWin,
     );
+    let winner: ChipColor[] | null = winnerColor ? [winnerColor] : null;
+
+    // Covers a case RULES.md doesn't spell out: the deck runs dry and the
+    // player about to take the next turn has nothing left that can end
+    // it — every card in their hand is dead and there's nothing left to
+    // draw a replacement from. Left alone the game would just sit frozen
+    // on their turn forever, so resolve it right here by sequence count
+    // instead (see resolveStalemateWinners).
+    if (!winner) {
+      const nextPlayer = activeGame.players[applied.currentSeatIndex];
+      const nextPlayerHand = nextHands[nextPlayer.id] ?? [];
+      if (
+        deckAfterMove.length === 0 &&
+        !hasLegalMove(nextPlayerHand, applied.board, applied.sequenceUsage, nextPlayer.chipColor)
+      ) {
+        winner = resolveStalemateWinners(activeGame.players, applied.sequences);
+      }
+    }
 
     setGame({
       ...activeGame,
@@ -299,7 +328,7 @@ export default function Home() {
       currentSeatIndex: applied.currentSeatIndex,
       turnNumber: applied.turnNumber,
       hands: nextHands,
-      deck: drawnCard ? restDeck : activeGame.deck,
+      deck: deckAfterMove,
       winner,
     });
     setSelectedInstanceId(null);
@@ -325,11 +354,24 @@ export default function Home() {
     );
     const [drawnCard, ...restDeck] = activeGame.deck;
     const nextHand = drawnCard ? [...handWithoutCard, drawnCard] : handWithoutCard;
+    const deckAfterSwap = drawnCard ? restDeck : activeGame.deck;
+
+    // A dead-card swap doesn't end the turn, so the *same* player can end
+    // up stuck immediately after one: the deck just ran out and every
+    // card left in their hand is also dead, with no replacement ever
+    // coming. Resolve right here rather than leaving the UI waiting on a
+    // move that can never happen — see the matching check in playMove.
+    const winner =
+      deckAfterSwap.length === 0 &&
+      !hasLegalMove(nextHand, activeGame.board, activeGame.sequenceUsage, activePlayer.chipColor)
+        ? resolveStalemateWinners(activeGame.players, activeGame.sequences)
+        : null;
 
     setGame({
       ...activeGame,
       hands: { ...activeGame.hands, [activePlayer.id]: nextHand },
-      deck: drawnCard ? restDeck : activeGame.deck,
+      deck: deckAfterSwap,
+      winner,
     });
     setSelectedInstanceId(null);
   }
@@ -433,7 +475,7 @@ export default function Home() {
 
       {activeGame.winner ? (
         <div className="shrink-0 rounded bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-          {winningLabel} wins!
+          {winningLabel}
         </div>
       ) : selectedCardIsDead ? (
         <div className="flex shrink-0 items-center gap-2 rounded bg-red-100 px-3 py-1 text-sm text-red-800 dark:bg-red-900/40 dark:text-red-200">

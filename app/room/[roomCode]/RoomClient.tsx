@@ -129,13 +129,19 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
     wasMyTurnRef.current = isMyTurn;
   }, [isMyTurn, game?.status, game?.winner]);
 
-  const winningPlayer = game?.winner
-    ? players.find((p) => p.chipColor === game.winner)
-    : undefined;
-  const winningLabel =
-    game?.mode === "two-team" && winningPlayer
-      ? `Team ${winningPlayer.team}`
-      : winningPlayer?.displayName;
+  // game.winner: null = not over, [] = draw, 1+ colors = win (more than
+  // one means a tie for the lead at a stalemate — see
+  // resolveStalemateWinners in lib/game/winCondition.ts).
+  const winningLabel = (() => {
+    if (!game?.winner) return null;
+    if (game.winner.length === 0) return "It's a draw!";
+    const winners = players.filter((p) => game.winner!.includes(p.chipColor));
+    const names =
+      game.mode === "two-team"
+        ? [...new Set(winners.map((p) => `Team ${p.team}`))]
+        : winners.map((p) => p.displayName);
+    return names.length > 1 ? `${names.join(" & ")} tie!` : `${names[0] ?? "Someone"} wins!`;
+  })();
 
   function handleSquareClick(index: SquareIndex) {
     // Blocks a rushed double-click: the board round-trips over the
@@ -287,7 +293,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
       {game.winner ? (
         <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-5 text-center shadow-xl dark:border-amber-900 dark:from-amber-950/60 dark:to-zinc-900">
           <p className="bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-xl font-extrabold text-transparent">
-            {winningLabel ?? "Someone"} wins!
+            {winningLabel ?? "Game over!"}
           </p>
           {isHost ? (
             <div className="flex w-full flex-col gap-2">
