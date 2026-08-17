@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getSquaresForCard } from "../board-layout";
-import { applyMove, getPlayableSquares, validateMove } from "../moves";
+import { BOARD_LAYOUT, getSquaresForCard } from "../board-layout";
+import { applyMove, getPlayableSquares, hasLegalMove, validateMove } from "../moves";
 import type { BoardChips, Card, Move, SequenceRecord } from "../types";
 
 const normalCard: Card = { rank: "7", suit: "diamonds" };
@@ -194,5 +194,53 @@ describe("getPlayableSquares", () => {
     const result = getPlayableSquares(oneEyedJack, board, { 30: 1 }, "red");
     expect(result?.action).toBe("remove-opponent");
     expect(result?.squares.sort()).toEqual([10]);
+  });
+});
+
+describe("hasLegalMove", () => {
+  it("is true when at least one card in hand can be placed", () => {
+    const board: BoardChips = {};
+    expect(hasLegalMove([normalCard], board, {}, "red")).toBe(true);
+  });
+
+  it("is false for an empty hand", () => {
+    expect(hasLegalMove([], {}, {}, "red")).toBe(false);
+  });
+
+  it("is false when every card in hand is dead", () => {
+    const [squareA, squareB] = getSquaresForCard(normalCard);
+    const board: BoardChips = { [squareA]: "red", [squareB]: "blue" };
+    expect(hasLegalMove([normalCard], board, {}, "red")).toBe(false);
+  });
+
+  it("is true when only some cards in hand are dead", () => {
+    const deadCard: Card = { rank: "7", suit: "diamonds" };
+    const [squareA, squareB] = getSquaresForCard(deadCard);
+    const board: BoardChips = { [squareA]: "red", [squareB]: "blue" };
+    const playableCard: Card = { rank: "9", suit: "clubs" };
+    expect(hasLegalMove([deadCard, playableCard], board, {}, "red")).toBe(true);
+  });
+
+  it("is true for a two-eyed jack when any non-corner square is open", () => {
+    expect(hasLegalMove([twoEyedJack], {}, {}, "red")).toBe(true);
+  });
+
+  it("is false for a two-eyed jack when the entire board is full", () => {
+    const board: BoardChips = {};
+    for (const square of BOARD_LAYOUT) {
+      if (square.kind === "card") board[square.index] = "red";
+    }
+    expect(hasLegalMove([twoEyedJack], board, {}, "blue")).toBe(false);
+  });
+
+  it("is false for a one-eyed jack with no removable opponent chips", () => {
+    expect(hasLegalMove([oneEyedJack], {}, {}, "red")).toBe(false);
+    const board: BoardChips = { 55: "blue" };
+    expect(hasLegalMove([oneEyedJack], board, { 55: 1 }, "red")).toBe(false);
+  });
+
+  it("is true for a one-eyed jack with a removable opponent chip", () => {
+    const board: BoardChips = { 55: "blue" };
+    expect(hasLegalMove([oneEyedJack], board, {}, "red")).toBe(true);
   });
 });

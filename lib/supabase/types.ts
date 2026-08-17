@@ -28,7 +28,10 @@ export interface GameRow {
   deck_count: number;
   current_seat_index: number;
   turn_number: number;
-  winner: ChipColor | null;
+  // null: not over. Empty array: over as a draw. Non-empty: winning
+  // color(s) — more than one means a tie for the lead at a stalemate
+  // (see resolveStalemateWinners in lib/game/winCondition.ts).
+  winner: ChipColor[] | null;
   // Host-set at start time, applies to every player — not a per-client
   // preference (see RoomClient.tsx).
   hints_enabled: boolean;

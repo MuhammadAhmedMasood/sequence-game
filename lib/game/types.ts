@@ -73,7 +73,10 @@ export interface GameState {
   discardTop: Card | null;
   deckCount: number; // count only — never the order/identity of remaining cards
   status: "lobby" | "in_progress" | "completed";
-  winner: ChipColor | null;
+  // null: game not over. Empty array: over as a draw. Non-empty: those
+  // colors/teams won (more than one entry means a tie for the lead — see
+  // resolveStalemateWinners in winCondition.ts).
+  winner: ChipColor[] | null;
   turnNumber: number;
 }
 

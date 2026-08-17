@@ -19,7 +19,7 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
 ## Status: all 5 original milestones complete, plus a polish/fixes round
 
 1. **Static board + hand UI** — done
-2. **Pure game-logic module + unit tests** — done, 81 tests passing
+2. **Pure game-logic module + unit tests** — done, 97 tests passing
 3. **Supabase integration (live multiplayer)** — done
 4. **Full flow** (landing → lobby → live game) — done
 5. **Polish** (visuals, mobile, score tally, win/rematch) — done
@@ -30,6 +30,11 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
 8. **Hand-sync bug fix** — a player's own hand could permanently lose a
    card after playing it on an unreliable connection; done (see "Hard-won
    bugs" #8)
+9. **Deck-exhaustion stalemate detection** — a game with nobody able to
+   complete a winning sequence could grind to a permanent halt once the
+   deck ran out; done (see "Hard-won bugs" #9). Required a live schema
+   migration (`games.winner` widened from `text` to `text[]`), already
+   applied to the hosted Supabase project.
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -68,8 +73,10 @@ Pushed to GitHub — see "Repository" below.
   updates on every move, and layers several resilience mechanisms on top
   (see "Hard-won bugs" below): a turn-number staleness guard, a 4s
   games/players polling fallback, a separate 4s own-hand polling
-  fallback, and applying `play_card_and_draw`'s RPC response directly
-  for the acting player's hand instead of trusting Realtime for it.
+  fallback, applying `play_card_and_draw`'s RPC response directly for the
+  acting player's hand instead of trusting Realtime for it, and a
+  reactive deck-exhaustion stalemate check that ends the game by
+  sequence count when nobody can move any further.
 - `app/room/[roomCode]/RoomClient.tsx` — the main orchestrator: lobby vs.
   live game vs. game-over, turn indicator, score sidebar, jack legend, board
   click handling.
@@ -82,7 +89,10 @@ Pushed to GitHub — see "Repository" below.
   `decks` (secret, no client access at all), `moves`; RLS policies; three
   `SECURITY DEFINER` RPCs (`deal_game`, `play_card_and_draw`,
   `rematch_game`). This file is the source of truth — always apply changes
-  here to the live Supabase project too via the SQL Editor.
+  here to the live Supabase project too via the SQL Editor. `games.winner`
+  is `text[]`, not a single value: `null` = not over, `[]` = draw, 1+
+  colors = win (more than one is a tie for the lead at a stalemate — see
+  `resolveStalemateWinners` in `lib/game/winCondition.ts`).
 
 **Trust model** (deliberate, documented in the plan): RLS + RPCs hard-enforce
 identity, turn order, and hand/deck secrecy. Move *content* legality (valid
@@ -219,6 +229,35 @@ These were each non-obvious, verified by direct reproduction, not guessed:
    "empty hand right after Start game" case, confirmed it was a delivery
    gap (not a data bug) by watching the same `hands` select the poll now
    runs fix it once the tab is genuinely visible.
+9. **A game could grind to a permanent, unrecoverable halt near the end
+   of the deck** — reported live in a 3-player game: nobody could
+   complete another sequence, and eventually a player was left holding
+   only dead cards (both squares of every card already covered) with the
+   deck empty, so a dead-card swap couldn't draw a replacement either.
+   RULES.md doesn't cover this case, and nothing in the app detected it
+   — the game just sat frozen on that player's turn forever. Fixed with
+   `hasLegalMove` (`lib/game/moves.ts`, true only if some card in hand
+   can actually place/remove right now) and `resolveStalemateWinners`
+   (`lib/game/winCondition.ts`, declares whoever has the most completed
+   sequences the winner, a shared win on a tie for the lead, or a full
+   draw if every player is tied — including 0-0-0). Wired in as a
+   reactive check in `hooks/useGame.ts` (online) and directly in
+   `playMove`/`handleDeadCardSwap` (local hot-seat in `app/page.tsx`).
+   The online check only ever evaluates *the acting client's own hand*
+   — never another player's — matching the existing trust model, and
+   resolves by writing straight to `games` since RLS's "update on your
+   turn" policy already permits exactly that player to do so. This
+   required widening `games.winner` from a single color to an array (see
+   the schema.sql bullet in "Architecture") to represent ties/draws, a
+   live migration applied to the hosted Supabase project via the SQL
+   Editor (verified via `information_schema.columns` before and after,
+   and by spot-checking existing rows converted cleanly — no data loss).
+   Verified with a 60-game full-simulation test (`lib/game/__tests__/
+   stalemate.test.ts`, 20 seeded trials × all 3 modes) proving the game
+   always reaches a resolved end state and never deadlocks, plus a live
+   end-to-end check against the migrated production DB (SQL-set a room
+   to `completed`/`winner: ["red"]`, confirmed the UI rendered "X wins!"
+   correctly).
 
 ## Decisions worth knowing about
 
@@ -238,7 +277,7 @@ These were each non-obvious, verified by direct reproduction, not guessed:
 
 ## Testing notes for future sessions
 
-- `npm run test` (Vitest) covers all of `lib/game/` — 81 tests, keep green.
+- `npm run test` (Vitest) covers all of `lib/game/` — 97 tests, keep green.
 - For manual multiplayer testing without two real browser identities: insert
   a second/third player row directly via the Supabase SQL Editor (bypasses
   RLS as the `postgres` role) rather than trying to fake a second session in
