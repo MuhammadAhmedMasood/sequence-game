@@ -5,6 +5,8 @@ via a shareable room link, no accounts and no downloads. Also playable
 hot-seat style in a single browser tab if you'd rather practice solo or pass
 the device around.
 
+**[Play it now → sequence.dizzlerai.com](https://sequence.dizzlerai.com)**
+
 ![Landing page](docs/screenshots/landing.jpg)
 
 ## What's here
@@ -85,6 +87,10 @@ By default, 2-player and 2-team games need **2 sequences** to win, while
 for any mode before starting.
 
 ## Getting started
+
+Just want to play? Head to
+**[sequence.dizzlerai.com](https://sequence.dizzlerai.com)** — no setup
+needed. The rest of this section is for running it locally.
 
 ```bash
 git clone https://github.com/MuhammadAhmedMasood/sequence-game.git

@@ -13,8 +13,10 @@ for the authoritative game rules and `CLAUDE.md` for project conventions.
 
 **Stack**: Next.js 16 (App Router) + TypeScript + Tailwind CSS, Supabase
 (Postgres + Realtime + Anonymous Auth) for multiplayer state, Vitest for the
-game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
-(deployment to Vercel is explicitly out of scope so far).
+game-logic unit tests. Deployed on Vercel, live at
+**[sequence.dizzlerai.com](https://sequence.dizzlerai.com)** (custom domain
+pointing at the `sequence-game-steel.vercel.app` deployment) — see
+"Repository" below for how the deploy is wired up.
 
 ## Status: all 5 original milestones complete, plus a polish/fixes round
 
@@ -52,6 +54,11 @@ game-logic unit tests. Not yet deployed — runs locally via `npm run dev`
     never at what put a chip there — confirmed against the official
     rules too). Added explicit regression tests for it (see "Hard-won
     bugs" #10 for the reasoning) rather than changing any logic.
+12. **Real README** — replaced the create-next-app boilerplate with a
+    proper overview: what the game is, full rules, screenshots, local
+    setup, tech stack, and an annotated project structure + design-notes
+    section for anyone reading the code. Also links the live deployment
+    (`sequence.dizzlerai.com`) prominently at the top.
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -71,6 +78,20 @@ Pushed to GitHub — see "Repository" below.
   the `gh` path was confirmed working — unused, but harmless to leave in
   place if you'd rather switch the remote to SSH later
   (`git@github.com:MuhammadAhmedMasood/sequence-game.git`).
+- **Live deployment**: Vercel, custom domain `sequence.dizzlerai.com` →
+  `sequence-game-steel.vercel.app`. Auto-deploys from `main` (visible under
+  the repo's "Deployments" — pushing to `main` is effectively shipping).
+- **Commit attribution**: no `Co-Authored-By` trailer on any commit, by
+  design — see `note.md` (gitignored, not in the repo) for the standing
+  instruction. GitHub's contributors list should show only
+  `MuhammadAhmedMasood`; verified via `git log --grep`/API right after the
+  history rewrite that scrubbed the old trailers.
+- **GitHub outage encountered 2026-08-17** (worth knowing if this recurs):
+  a live, GitHub-wide incident made raw file content (README images) and
+  the contributors sidebar throw errors/show stale data for a while —
+  confirmed via githubstatus.com, not caused by anything in this repo.
+  Resolves on its own; no local fix needed if you see this again and
+  githubstatus.com shows an active incident.
 - `.env.local` (Supabase URL + anon key) is correctly gitignored and has
   never been committed — confirmed via `git ls-files` and a check of the
   pushed tree on GitHub.
@@ -332,7 +353,6 @@ These were each non-obvious, verified by direct reproduction, not guessed:
 
 ## Not yet done / explicitly out of scope so far
 
-- Deployment (Vercel). Nothing blocking it, just hasn't been asked for yet.
 - Any account system (by design — room-code based, no auth beyond anonymous
   per-browser identity).
 - Kicking/removing a player from a room, or cleaning up abandoned rooms.
