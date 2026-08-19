@@ -71,6 +71,29 @@ pointing at the `sequence-game-steel.vercel.app` deployment) — see
     strike, in both the live board and the local hot-seat board — purely
     visual, `sequencedSquares` threaded down from `game.sequences`/
     `activeGame.sequences` into `Board`/`BoardSquare`.
+14. **Full UI redesign — felt & gold theme** (2026-08-19): replaced the
+    ad-hoc indigo/purple/zinc Tailwind classes across every screen
+    (landing, waiting room, board, hand, score/jack panels) with one
+    centralized token system in `app/globals.css` — a card-table felt
+    background (deliberately a dark surface in *both* light and dark mode,
+    not flat white), a warm gold accent, jewel-tone chip colors, and
+    CSS-variable-driven dark mode that auto-swaps without scattered
+    `dark:` classes at every call site. The board is now a wood-toned
+    framed container with playing-card-style cells; a completed sequence
+    draws an actual connecting line across it (SVG, from the first to the
+    last square in the run) instead of item 13's per-chip diagonal strike;
+    placed chips are translucent (55% normally, 30% once part of a
+    sequence) so the card's rank/suit stays legible underneath — both
+    changes were direct user feedback after the first pass looked too
+    opaque/cluttered. Legal-move shading uses a new teal token instead of
+    gold, since gold was already the accent color everywhere else and
+    competed with itself. New shared `JackLegend`/`JackHelpButton`
+    components (deduped the old copy-pasted sidebar panel across two
+    files) add a mobile bottom-sheet popover for the jack-rules
+    explanation, previously invisible on phones. README screenshots
+    regenerated to match. See "Hard-won bugs" #12–14 for three real bugs
+    hit along the way (dark-mode contrast, an animation silently
+    overriding chip opacity, and a board-sizing bug).
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -135,6 +158,22 @@ Pushed to GitHub — see "Repository" below.
   touch).
 - `components/game/Scoreboard.tsx` — per-player/per-team sequence-progress
   panel (sidebar on desktop, compact pill bar on mobile).
+- `components/game/JackLegend.tsx` / `JackHelpButton.tsx` — the two-eyed/
+  one-eyed jack explanation, shared between the desktop sidebar panel and a
+  mobile bottom-sheet popover (a "?" button) so both stay in sync instead
+  of being copy-pasted per screen.
+- `app/globals.css` — the design-token system: theme-dependent CSS
+  variables (felt background, card face, ink, panel glass) on `:root`,
+  overridden under `prefers-color-scheme: dark`, then re-exposed as
+  Tailwind utilities via `@theme inline` — so `bg-card-face`/`text-ink`/etc.
+  pick up the right light/dark value with no `dark:` variant needed at the
+  call site. Theme-independent tokens (gold accent scale, chip colors,
+  radii, shadows, the teal "legal move" color) live in a plain `@theme`
+  block. One exception to the "theme-flipping var" pattern: `--felt-ink`,
+  for text painted directly on the felt background — the felt itself is
+  dark in *both* themes, so that text needs a light color that stays
+  constant rather than flipping like `--ink` does (see Hard-won bugs
+  below for what happens when that distinction gets missed).
 - `supabase/schema.sql` — full schema: `games`, `players`, `hands` (secret),
   `decks` (secret, no client access at all), `moves`; RLS policies; four
   `SECURITY DEFINER` RPCs (`deal_game`, `play_card_and_draw`,
@@ -190,9 +229,16 @@ for a casual game among friends; avoids standing up an Edge Function layer.
   click, not after a network round trip.
 - Win detection: the game ends the instant a player/team reaches
   sequencesToWin, live, for every connected client.
-- Completed sequences are visually distinct on the board: their chips render
-  dulled with a diagonal strike, instead of staying visually identical to an
-  active chip.
+- Completed sequences are visually distinct on the board: an SVG line is
+  drawn from the first to the last square of the run (in the owner's chip
+  color), and its chips render more translucent (30% vs. the normal
+  placed-chip's 55%) so the sequence reads as "spent" without needing a
+  separate overlay layer.
+- Placed chips are translucent, not solid — the board cell's rank/suit stays
+  legible underneath a chip rather than being fully hidden.
+- Mobile Jack-rules help: a "?" button opens a bottom-sheet popover with the
+  same two-eyed/one-eyed explanation the desktop sidebar shows, since that
+  sidebar is hidden on narrow viewports.
 - Game-over screen: "Play again" (host-only, redeals immediately with the
   same lineup) and, in 2v2 only, "Shuffle teams & play again" (back to the
   lobby team picker). "Exit to home" available to everyone.
@@ -200,10 +246,13 @@ for a casual game among friends; avoids standing up an Edge Function layer.
   external asset).
 - Rapid-double-click guard on board squares (ref-based synchronous check,
   since React state updates are batched/async).
-- Full visual redesign (indigo/violet gradient theme, glassy cards) across
-  landing page, lobby, and game view; verified usable at mobile viewport
-  widths (390×844) via an emulation trick, and confirmed genuinely working
-  on both a real phone and laptop after the LAN-access fix below.
+- Full visual redesign — a shared "felt & gold" theme (card-table felt
+  background, warm gold accent, jewel-tone chips) driven by centralized
+  design tokens in `app/globals.css`, across landing page, lobby, and game
+  view; verified usable at mobile viewport widths (390×844, then ~500px
+  once the resize tool's floor was hit) via browser automation, and
+  confirmed genuinely working on both a real phone and laptop after the
+  LAN-access fix below.
 
 ## Hard-won bugs (read before touching `hooks/useGame.ts` again)
 
@@ -349,6 +398,55 @@ These were each non-obvious, verified by direct reproduction, not guessed:
     `lobby`, then flips both rows' `team`/`chip_color` together. Dropping
     your name directly onto an occupant of the other column now triggers
     this instead of the empty-slot `setTeam` path.
+12. **Dark mode made several redesign elements invisible, because a
+    theme-flipping token was reused for the wrong purpose** — two separate
+    instances of the same underlying mistake, both found by manually
+    overriding the CSS custom properties to simulate dark mode (there's no
+    way to flip the OS setting from browser automation) and screenshotting:
+    (a) header/tagline text used `text-card-face`, which is light cream in
+    light mode (reads fine on the dark felt) but flips to near-black in
+    dark mode since it's the *card surface* token, not text-on-felt — so
+    it went invisible. Fixed by adding `--felt-ink`, a light color that
+    deliberately does *not* flip between themes, since the felt background
+    itself is dark in both. (b) Several gold-filled buttons/badges/pills
+    (mode selector active state, "Your turn!" pill, host badges, primary
+    CTAs) paired a solid gold background with `text-ink` — `--ink` also
+    flips (dark in light mode, light in dark mode), so pairing it with a
+    background that *doesn't* flip put light cream text on a light gold
+    button in dark mode. Fixed by adding a second, non-flipping
+    `--ink-fixed`/`--parchment` pair for anything painted directly on gold.
+    General lesson: a theme-flipping token is only safe to pair with
+    another element that flips *in sync* with it (same background); a
+    fixed-color surface needs a fixed-color pairing.
+13. **A CSS keyframe animation silently pinned chip opacity back to 1, no
+    matter what `opacity-*` utility class was applied** (`app/globals.css`,
+    the `chip-place` animation) — a real debugging detour: repeatedly
+    lowering the opacity class on placed chips (80→55→30, per user
+    feedback that the card underneath should stay visible) had zero
+    visible effect, even after confirming via `curl`ing the compiled
+    stylesheet that the CSS rule genuinely existed with the correct value.
+    Root cause: `chip-place`'s keyframes animated `opacity` (0→1→1, part of
+    the placement "settle" effect) alongside `transform`, and with
+    `animation-fill-mode: both`, a CSS animation's effect on a property
+    wins over any static declaration for that same property regardless of
+    specificity — so the animation's own final `opacity: 1` silently
+    overrode the utility class forever, the instant the 260ms animation
+    finished. Fixed by making the keyframes transform-only (scale, no
+    opacity) — the animation stops touching the property at all, so the
+    static class applies normally. General lesson: never animate a CSS
+    property that a separate utility class on the same element is also
+    meant to control.
+14. **The board rendered far smaller than intended because `h-full` was on
+    the wrong element** — after splitting the single board container into
+    a wood-toned outer frame + inner grid (for the redesign), the sizing
+    classes (`h-full w-auto max-w-full aspect-square`) stayed on the
+    *inner* grid, whose parent (the frame) had no defined height of its
+    own. `height: 100%` against an auto-height parent computes to nothing,
+    so the grid silently fell back to its own intrinsic content size
+    instead of filling the available space — reported as "the board (and
+    its cards) need to be bigger." Fixed by moving the sizing classes onto
+    the outer frame and letting the inner grid just fill it
+    (`h-full w-full`).
 
 ## Decisions worth knowing about
 
@@ -394,6 +492,19 @@ These were each non-obvious, verified by direct reproduction, not guessed:
   body immediately before typing. `navigator.clipboard.writeText` from the
   page's own JS console also isn't reliable there ("Document is not
   focused") — don't rely on clipboard paste as the primary path.
+
+- To visually verify a specific board state (e.g. a completed sequence,
+  many scattered chips) without manually playing dozens of real turns to
+  reach it: in the local hot-seat mode, grab the `Home` component's React
+  fiber from a DOM node (`dom['__reactFiber$...']`, walk `.return` until
+  `type.name === 'Home'`), find the `game` state hook by shape (its
+  `memoizedState` has `.mode`/`.players`/`.board`, not by hardcoding a hook
+  index — hook order shifts easily and doing it by index silently grabs
+  the wrong hook), then call `hook.queue.dispatch({...game, board: {...},
+  sequences: [...]})` directly. Much faster than trying to steer random
+  card draws into a specific board layout, and was how the sequence-line
+  and chip-transparency fixes in this session were actually confirmed
+  working.
 
 ## Not yet done / explicitly out of scope so far
 
