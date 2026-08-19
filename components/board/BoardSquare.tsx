@@ -18,13 +18,18 @@ const CHIP_CLASSES: Record<ChipColor, string> = {
 // Tailwind can't build class names from string concatenation at runtime,
 // so the full shade/ring pair has to be spelled out per color rather than
 // interpolated (e.g. `ring-chip-${color}`) — see the Tailwind docs on
-// dynamic class names. Selected squares get a full-cell tint in the
-// acting player's chip color; the weaker ambient "hinted" state (every
-// playable square for the hand, not just the chosen card) uses gold.
+// dynamic class names. Selected squares get a full-cell gold wash (the
+// same "you're about to act here" hue as the turn indicator) plus a thin
+// ring in the acting player's chip color for identity. The fill deliberately
+// does NOT reuse the raw chip color: an earlier version tinted the whole
+// tile in the acting player's own color, which for the green player made
+// an empty "you can place here" tile look identical to a square that
+// already had a green chip on it. The weaker ambient "hinted" state (every
+// playable square for the hand, not just the chosen card) uses violet.
 const SELECTED_OVERLAY_CLASSES: Record<ChipColor, string> = {
-  red: "bg-chip-red/35 ring-2 ring-inset ring-chip-red",
-  blue: "bg-chip-blue/35 ring-2 ring-inset ring-chip-blue",
-  green: "bg-chip-green/35 ring-2 ring-inset ring-chip-green",
+  red: "bg-gold-300/40 ring-2 ring-inset ring-chip-red",
+  blue: "bg-gold-300/40 ring-2 ring-inset ring-chip-blue",
+  green: "bg-gold-300/40 ring-2 ring-inset ring-chip-green",
 };
 
 interface BoardSquareProps {
