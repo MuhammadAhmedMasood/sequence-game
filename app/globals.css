@@ -116,11 +116,15 @@
   --color-hint-400: #a78bfa;
   --color-hint-500: #7c5cf0;
 
-  /* Jewel-tone player chips — same across themes, opaque enough to read anywhere */
+  /* Jewel-tone player chips — same across themes, opaque enough to read anywhere.
+     Blue is deliberately a darker navy rather than a lighter sky blue: a
+     lighter blue sat too close to the violet hint tile (--color-hint-400
+     above) to tell apart at a glance, so it's pulled toward navy — low
+     enough on the red channel to read as clearly distinct from violet. */
   --color-chip-red: #d64545;
   --color-chip-red-strong: #b53232;
-  --color-chip-blue: #3b6fd6;
-  --color-chip-blue-strong: #2c56ad;
+  --color-chip-blue: #1d4ed8;
+  --color-chip-blue-strong: #1a3a8f;
   --color-chip-green: #3fa66a;
   --color-chip-green-strong: #2f8452;
 
