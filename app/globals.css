@@ -107,9 +107,14 @@
   /* Legal-move shading — deliberately NOT gold, since gold is already the
      brand accent (corners, buttons, turn indicator); reusing it for "you
      can play here" made every gold thing on screen compete for attention.
-     A cool teal reads as a distinct, unambiguous "actionable" signal. */
-  --color-hint-400: #35b9a9;
-  --color-hint-500: #1f9689;
+     Also deliberately NOT teal/green: in 3-player games the third chip
+     color is green (--color-chip-green below), and an earlier teal hint
+     was close enough to green chips to confuse "playable square" with
+     "green player's chip." Violet has no chip or accent color anywhere
+     near it, so it reads as an unambiguous "actionable" signal in every
+     mode. */
+  --color-hint-400: #a78bfa;
+  --color-hint-500: #7c5cf0;
 
   /* Jewel-tone player chips — same across themes, opaque enough to read anywhere */
   --color-chip-red: #d64545;
