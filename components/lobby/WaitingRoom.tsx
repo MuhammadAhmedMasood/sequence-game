@@ -32,9 +32,9 @@ const MAX_PLAYERS: Record<GameMode, number> = {
 };
 
 const CHIP_DOT_CLASSES: Record<ChipColor, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
+  red: "bg-gradient-to-br from-chip-red to-chip-red-strong",
+  blue: "bg-gradient-to-br from-chip-blue to-chip-blue-strong",
+  green: "bg-gradient-to-br from-chip-green to-chip-green-strong",
 };
 
 const TEAM_COLUMN_STYLES: Record<
@@ -42,14 +42,14 @@ const TEAM_COLUMN_STYLES: Record<
   { border: string; heading: string; hover: string }
 > = {
   A: {
-    border: "border-red-200 dark:border-red-900",
-    heading: "text-red-600 dark:text-red-400",
-    hover: "border-red-400 bg-red-50 dark:bg-red-950/40",
+    border: "border-chip-red/30",
+    heading: "text-chip-red-strong",
+    hover: "border-chip-red bg-chip-red/10",
   },
   B: {
-    border: "border-blue-200 dark:border-blue-900",
-    heading: "text-blue-600 dark:text-blue-400",
-    hover: "border-blue-400 bg-blue-50 dark:bg-blue-950/40",
+    border: "border-chip-blue/30",
+    heading: "text-chip-blue-strong",
+    hover: "border-chip-blue bg-chip-blue/10",
   },
 };
 
@@ -131,7 +131,7 @@ function TeamColumns({ players, myPlayerId, onSetTeam, onSwapTeam }: TeamColumns
 
   return (
     <div className="flex w-full flex-col gap-2">
-      <p className="text-center text-xs font-medium text-zinc-500 dark:text-zinc-400">
+      <p className="text-center text-xs font-medium text-panel-ink-soft">
         {myPlayer ? "Drag your name into a team, or onto a player to swap" : "Teams"}
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -158,9 +158,11 @@ function TeamColumns({ players, myPlayerId, onSetTeam, onSwapTeam }: TeamColumns
                   return (
                     <div
                       key={`empty-${slot}`}
-                      className="flex h-10 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-xs text-zinc-300 dark:border-zinc-700 dark:text-zinc-600"
+                      className="flex h-11 items-center justify-center gap-1 rounded-lg border border-dashed border-card-border text-xs text-ink-soft/60"
                     >
-                      Empty
+                      <span className="animate-dot-blink [animation-delay:0ms]">•</span>
+                      <span className="animate-dot-blink [animation-delay:150ms]">•</span>
+                      <span className="animate-dot-blink [animation-delay:300ms]">•</span>
                     </div>
                   );
                 }
@@ -177,31 +179,31 @@ function TeamColumns({ players, myPlayerId, onSetTeam, onSwapTeam }: TeamColumns
                     onPointerUp={isMe ? endDrag : undefined}
                     onPointerCancel={isMe ? endDrag : undefined}
                     style={isMe ? { touchAction: "none" } : undefined}
-                    className={`flex h-10 items-center gap-2 rounded-lg border px-2 text-sm select-none ${
+                    className={`flex h-11 items-center gap-2 rounded-lg border px-2 text-sm select-none transition-colors ${
                       isMe
-                        ? "cursor-grab border-indigo-300 bg-indigo-50 active:cursor-grabbing dark:border-indigo-700 dark:bg-indigo-950"
+                        ? "cursor-grab border-gold-500 bg-gold-200/30 active:cursor-grabbing"
                         : isSwapTarget
-                          ? "border-indigo-400 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/40"
-                          : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800"
+                          ? "border-gold-400 bg-gold-200/25"
+                          : "border-card-border bg-card-face"
                     } ${isBeingDragged ? "opacity-30" : ""}`}
                   >
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${CHIP_DOT_CLASSES[p.chipColor]}`} />
-                    <span className="flex-1 truncate">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-chip ${CHIP_DOT_CLASSES[p.chipColor]}`} />
+                    <span className="flex-1 truncate text-ink">
                       {p.displayName}
                       {isMe ? " (you)" : ""}
                     </span>
                     {p.seatIndex === 0 ? (
-                      <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[0.6rem] font-semibold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      <span className="shrink-0 rounded bg-gold-400/90 px-1 py-0.5 text-[0.6rem] font-semibold uppercase text-ink-fixed">
                         Host
                       </span>
                     ) : null}
                     {isMe ? (
-                      <span className="shrink-0 text-zinc-400" aria-hidden>
+                      <span className="shrink-0 text-ink-soft" aria-hidden>
                         ⠿
                       </span>
                     ) : null}
                     {isSwapTarget ? (
-                      <span className="shrink-0 text-indigo-500 dark:text-indigo-400" aria-hidden>
+                      <span className="shrink-0 text-gold-600" aria-hidden>
                         ⇄
                       </span>
                     ) : null}
@@ -223,9 +225,9 @@ function TeamColumns({ players, myPlayerId, onSetTeam, onSwapTeam }: TeamColumns
             pointerEvents: "none",
             zIndex: 50,
           }}
-          className="flex items-center gap-2 rounded-lg border border-indigo-400 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-lg dark:bg-zinc-800 dark:text-zinc-100"
+          className="flex items-center gap-2 rounded-lg border border-gold-500 bg-card-face px-3 py-2 text-sm font-medium text-ink shadow-panel"
         >
-          <span className={`h-2.5 w-2.5 rounded-full ${CHIP_DOT_CLASSES[myPlayer.chipColor]}`} />
+          <span className={`h-2.5 w-2.5 rounded-full shadow-chip ${CHIP_DOT_CLASSES[myPlayer.chipColor]}`} />
           {myPlayer.displayName}
         </div>
       ) : null}
@@ -270,28 +272,28 @@ export default function WaitingRoom({
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
-      <div className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900/80">
+    <main className="bg-felt flex min-h-dvh flex-col items-center justify-center gap-6 p-4">
+      <div className="animate-fade-slide-up flex w-full max-w-md flex-col items-center gap-6 rounded-frame border border-panel-border bg-panel p-6 shadow-panel backdrop-blur-sm sm:p-8">
         <div className="flex flex-col items-center gap-2">
-          <span className="rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+          <span className="rounded-full bg-gradient-to-r from-gold-400 to-gold-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-ink-fixed shadow-card">
             {MODE_LABELS[mode]}
           </span>
           <button
             type="button"
             onClick={handleCopy}
             title="Click to copy"
-            className="group flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2 font-mono text-2xl font-bold tracking-widest text-zinc-800 transition hover:border-indigo-400 hover:bg-indigo-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-indigo-950"
+            className="group flex items-center gap-2 rounded-xl border border-card-border bg-card-face px-4 py-2 font-mono text-2xl font-bold tracking-widest text-ink shadow-card transition hover:border-gold-500 hover:bg-gold-200/20"
           >
             {roomCode}
-            <span className="text-xs font-sans font-normal text-zinc-400 group-hover:text-indigo-500">
+            <span className="font-sans text-xs font-normal text-ink-soft group-hover:text-gold-700">
               {copied ? "Copied!" : "Copy"}
             </span>
           </button>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Share this code with the others.</p>
+          <p className="text-sm text-panel-ink-soft">Share this code with the others.</p>
         </div>
 
         <div className="flex w-full flex-col gap-2">
-          <div className="flex items-center justify-between text-xs font-medium text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center justify-between text-xs font-medium text-panel-ink-soft">
             <span>Players</span>
             <span>
               {players.length}/{limit}
@@ -301,10 +303,10 @@ export default function WaitingRoom({
             {Array.from({ length: limit }).map((_, i) => (
               <div
                 key={i}
-                className={`h-1.5 flex-1 rounded-full transition-colors ${
+                className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
                   i < players.length
-                    ? "bg-gradient-to-r from-indigo-500 to-violet-500"
-                    : "bg-zinc-200 dark:bg-zinc-700"
+                    ? "bg-gradient-to-r from-gold-400 to-gold-600"
+                    : "bg-card-border"
                 }`}
               />
             ))}
@@ -318,16 +320,16 @@ export default function WaitingRoom({
               onSwapTeam={onSwapTeam}
             />
           ) : (
-            <ul className="flex flex-col gap-1.5 rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
+            <ul className="flex flex-col gap-1.5 rounded-xl border border-panel-border p-2">
               {players.map((p, i) => (
                 <li key={p.id} className="flex items-center gap-2 px-1 py-0.5 text-sm">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${CHIP_DOT_CLASSES[p.chipColor]}`} />
-                  <span className="flex-1 truncate">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-chip ${CHIP_DOT_CLASSES[p.chipColor]}`} />
+                  <span className="flex-1 truncate text-panel-ink">
                     {p.displayName}
-                    {p.id === myPlayerId ? <span className="text-zinc-400"> (you)</span> : null}
+                    {p.id === myPlayerId ? <span className="text-panel-ink-soft"> (you)</span> : null}
                   </span>
                   {i === 0 ? (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <span className="rounded bg-gold-400/90 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-ink-fixed">
                       Host
                     </span>
                   ) : null}
@@ -336,9 +338,14 @@ export default function WaitingRoom({
               {Array.from({ length: limit - players.length }).map((_, i) => (
                 <li
                   key={`empty-${i}`}
-                  className="px-1 py-0.5 text-sm text-zinc-300 italic dark:text-zinc-600"
+                  className="flex items-center gap-1.5 px-1 py-0.5 text-sm text-panel-ink-soft/70 italic"
                 >
-                  Waiting for player…
+                  Waiting for player
+                  <span className="not-italic">
+                    <span className="animate-dot-blink [animation-delay:0ms]">.</span>
+                    <span className="animate-dot-blink [animation-delay:150ms]">.</span>
+                    <span className="animate-dot-blink [animation-delay:300ms]">.</span>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -348,22 +355,20 @@ export default function WaitingRoom({
         {full && isHost ? (
           <div className="flex w-full flex-col items-center gap-3">
             {!teamsBalanced ? (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Each team needs exactly 2 players before you can start.
-              </p>
+              <p className="text-xs text-red-suit">Each team needs exactly 2 players before you can start.</p>
             ) : null}
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-panel-ink-soft">
               <input
                 type="checkbox"
                 checked={hintsDraft}
                 onChange={(e) => onHintsChange(e.target.checked)}
-                className="h-4 w-4 accent-indigo-500"
+                className="h-4 w-4 accent-gold-500"
               />
               Enable hints for everyone
             </label>
-            <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+            <div className="flex items-center gap-2 text-sm text-panel-ink-soft">
               <span>Sequences to win</span>
-              <div className="flex overflow-hidden rounded-lg border border-zinc-300 dark:border-zinc-600">
+              <div className="flex overflow-hidden rounded-lg border border-card-border">
                 {([1, 2] as const).map((n) => (
                   <button
                     key={n}
@@ -371,8 +376,8 @@ export default function WaitingRoom({
                     onClick={() => onSequencesToWinChange(n)}
                     className={`px-3 py-1 text-sm font-medium transition ${
                       sequencesToWinDraft === n
-                        ? "bg-indigo-500 text-white"
-                        : "bg-white text-zinc-600 hover:bg-indigo-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                        ? "bg-gradient-to-b from-gold-400 to-gold-600 text-ink-fixed"
+                        : "bg-card-face text-panel-ink-soft hover:bg-gold-200/20"
                     }`}
                   >
                     {n}
@@ -384,15 +389,15 @@ export default function WaitingRoom({
               type="button"
               disabled={starting || !canStart}
               onClick={onStart}
-              className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 font-semibold text-white shadow-md transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl bg-gradient-to-b from-gold-400 to-gold-600 py-2.5 font-semibold text-ink-fixed shadow-card transition hover:brightness-105 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {starting ? "Starting…" : "Start game"}
             </button>
           </div>
         ) : full && !teamsBalanced ? (
-          <p className="text-sm text-zinc-400">Waiting for teams to even out…</p>
+          <p className="text-sm text-panel-ink-soft">Waiting for teams to even out…</p>
         ) : full ? (
-          <p className="text-sm text-zinc-400">Waiting for the host to start the game…</p>
+          <p className="text-sm text-panel-ink-soft">Waiting for the host to start the game…</p>
         ) : null}
       </div>
     </main>

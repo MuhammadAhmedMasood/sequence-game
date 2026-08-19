@@ -18,28 +18,30 @@ const MODES: { value: GameMode; label: string; sub: string }[] = [
 
 export default function ModeSelect({ value, onChange }: ModeSelectProps) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div role="radiogroup" aria-label="Game mode" className="grid grid-cols-3 gap-2">
       {MODES.map((mode) => (
         <button
           key={mode.value}
           type="button"
+          role="radio"
+          aria-checked={value === mode.value}
           onClick={() => onChange(mode.value)}
-          className={`flex flex-col items-center gap-0.5 rounded-xl border-2 px-2 py-2 text-center transition ${
+          className={`flex flex-col items-center gap-0.5 rounded-xl border-2 px-2 py-2 text-center transition-colors ${
             value === mode.value
-              ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
-              : "border-zinc-200 hover:border-indigo-300 dark:border-zinc-700 dark:hover:border-indigo-700"
+              ? "border-gold-500 bg-gradient-to-b from-gold-400 to-gold-500 shadow-card"
+              : "border-card-border hover:border-gold-400/60"
           }`}
         >
           <span
             className={`text-xs font-semibold ${
-              value === mode.value
-                ? "text-indigo-700 dark:text-indigo-300"
-                : "text-zinc-700 dark:text-zinc-200"
+              value === mode.value ? "text-ink-fixed" : "text-panel-ink"
             }`}
           >
             {mode.label}
           </span>
-          <span className="text-[0.65rem] text-zinc-400">{mode.sub}</span>
+          <span className={`text-[0.65rem] ${value === mode.value ? "text-ink-fixed/70" : "text-panel-ink-soft"}`}>
+            {mode.sub}
+          </span>
         </button>
       ))}
     </div>

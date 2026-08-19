@@ -65,23 +65,27 @@ export default function OnlinePlayPanel() {
   }
 
   const inputClasses =
-    "rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-600 dark:bg-zinc-800 dark:focus:ring-indigo-950";
+    "rounded-xl border border-card-border bg-card-face px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-gold-500 focus:ring-2 focus:ring-gold-300/40";
 
   return (
-    <div className="flex w-full flex-col gap-5 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900/80">
+    <div className="animate-fade-slide-up flex w-full flex-col gap-5 rounded-frame border border-panel-border bg-panel p-6 shadow-panel backdrop-blur-sm sm:p-7">
       {lastRoomCode ? (
         <button
           type="button"
           onClick={() => goToRoom(lastRoomCode)}
-          className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
+          className="group flex items-center justify-between rounded-xl border border-gold-500/40 bg-gold-200/20 px-4 py-2.5 text-sm font-medium text-panel-ink transition hover:bg-gold-200/35"
         >
-          <span>Rejoin room {lastRoomCode}</span>
-          <span aria-hidden>→</span>
+          <span>
+            Rejoin room <span className="font-mono tracking-widest text-gold-700">{lastRoomCode}</span>
+          </span>
+          <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
+            →
+          </span>
         </button>
       ) : null}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="display-name" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+        <label htmlFor="display-name" className="text-xs font-semibold text-panel-ink-soft">
           Your name
         </label>
         <input
@@ -95,26 +99,26 @@ export default function OnlinePlayPanel() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">New game</p>
+        <p className="text-xs font-semibold text-panel-ink-soft">New game</p>
         <ModeSelect value={mode} onChange={setMode} />
         <button
           type="button"
           disabled={busyAction !== null}
           onClick={handleCreate}
-          className="mt-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 font-semibold text-white shadow-md transition hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50"
+          className="mt-1 rounded-xl bg-gradient-to-b from-gold-400 to-gold-600 py-2.5 font-semibold text-ink-fixed shadow-card transition hover:brightness-105 active:brightness-95 disabled:opacity-50"
         >
           {busyAction === "create" ? "Creating…" : "Create room"}
         </button>
       </div>
 
-      <div className="flex items-center gap-3 text-xs font-medium text-zinc-400">
-        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700" />
+      <div className="flex items-center gap-3 text-xs font-medium text-panel-ink-soft">
+        <div className="h-px flex-1 bg-panel-border" />
         or
-        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700" />
+        <div className="h-px flex-1 bg-panel-border" />
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Have a code?</p>
+        <p className="text-xs font-semibold text-panel-ink-soft">Have a code?</p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -127,7 +131,7 @@ export default function OnlinePlayPanel() {
             type="button"
             disabled={busyAction !== null}
             onClick={handleJoin}
-            className="shrink-0 rounded-xl bg-zinc-800 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:opacity-50 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+            className="shrink-0 rounded-xl bg-ink px-4 py-2 font-semibold text-card-face shadow-card transition hover:brightness-125 disabled:opacity-50"
           >
             {busyAction === "join" ? "Joining…" : "Join"}
           </button>
@@ -135,7 +139,7 @@ export default function OnlinePlayPanel() {
       </div>
 
       {error ? (
-        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
+        <p className="rounded-xl border border-red-suit/30 bg-red-suit/10 px-3 py-2 text-sm text-red-suit">
           {error}
         </p>
       ) : null}

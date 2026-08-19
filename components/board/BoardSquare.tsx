@@ -10,9 +10,21 @@ const SUIT_SYMBOLS: Record<string, string> = {
 const RED_SUITS = new Set(["hearts", "diamonds"]);
 
 const CHIP_CLASSES: Record<ChipColor, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
+  red: "bg-gradient-to-br from-chip-red to-chip-red-strong",
+  blue: "bg-gradient-to-br from-chip-blue to-chip-blue-strong",
+  green: "bg-gradient-to-br from-chip-green to-chip-green-strong",
+};
+
+// Tailwind can't build class names from string concatenation at runtime,
+// so the full shade/ring pair has to be spelled out per color rather than
+// interpolated (e.g. `ring-chip-${color}`) — see the Tailwind docs on
+// dynamic class names. Selected squares get a full-cell tint in the
+// acting player's chip color; the weaker ambient "hinted" state (every
+// playable square for the hand, not just the chosen card) uses gold.
+const SELECTED_OVERLAY_CLASSES: Record<ChipColor, string> = {
+  red: "bg-chip-red/35 ring-2 ring-inset ring-chip-red",
+  blue: "bg-chip-blue/35 ring-2 ring-inset ring-chip-blue",
+  green: "bg-chip-green/35 ring-2 ring-inset ring-chip-green",
 };
 
 interface BoardSquareProps {
@@ -26,6 +38,8 @@ interface BoardSquareProps {
   hinted: boolean;
   // This square's chip is part of an already-completed sequence.
   inSequence: boolean;
+  // Colors the "selected" shade to match the acting player's chips.
+  playerColor: ChipColor;
   onClick: () => void;
 }
 
@@ -35,55 +49,60 @@ export default function BoardSquare({
   selected,
   hinted,
   inSequence,
+  playerColor,
   onClick,
 }: BoardSquareProps) {
+  const isCorner = square.kind === "corner";
   const isRed = square.kind === "card" && RED_SUITS.has(square.card.suit);
-
-  const bgClass =
-    square.kind === "corner"
-      ? "bg-amber-100 dark:bg-amber-900/40"
-      : selected
-        ? "bg-blue-200 dark:bg-blue-800/60"
-        : hinted
-          ? "bg-emerald-100 dark:bg-emerald-800/40"
-          : "bg-white dark:bg-zinc-900";
-
-  const ringClass = selected
-    ? "ring-2 ring-inset ring-blue-500"
-    : hinted
-      ? "ring-1 ring-inset ring-emerald-400"
-      : "";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex h-full w-full items-center justify-center overflow-hidden border border-zinc-200 text-xs leading-none sm:text-sm md:text-base dark:border-zinc-700 ${bgClass} ${ringClass}`}
+      className={`group relative flex h-full min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-card border text-sm leading-none transition-transform duration-150 ease-board sm:text-lg md:text-xl ${
+        isCorner
+          ? "border-gold-700/60 bg-gradient-to-br from-gold-300 to-gold-500"
+          : "border-card-border bg-gradient-to-b from-card-face-soft to-card-face shadow-card hover:z-10 hover:-translate-y-0.5 hover:shadow-card-lift active:translate-y-0"
+      } ${isRed ? "text-red-suit" : "text-ink"}`}
     >
-      {square.kind === "corner" ? (
-        <span className="text-amber-600 dark:text-amber-300">★</span>
+      {isCorner ? (
+        <>
+          <span
+            aria-hidden
+            className="animate-glow-breathe pointer-events-none absolute inset-0 rounded-card bg-gold-200/70 blur-[3px]"
+          />
+          <span className="relative text-gold-700 drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">★</span>
+        </>
       ) : (
-        <span
-          className={`font-semibold ${
-            isRed ? "text-red-600" : "text-zinc-700 dark:text-zinc-300"
-          }`}
-        >
-          {square.card.rank}
-          {SUIT_SYMBOLS[square.card.suit]}
-        </span>
-      )}
-      {chip ? (
-        <span
-          className={`absolute inset-1 rounded-full ${CHIP_CLASSES[chip]} ${
-            inSequence ? "opacity-55" : "opacity-90"
-          }`}
-        >
-          {inSequence ? (
+        <>
+          {/* Shades the entire cell, not just a boundary ring, so a
+              playable square reads as "you can put a card here" at a
+              glance — the rank/suit text paints on top and stays crisp. */}
+          {selected ? (
             <span
               aria-hidden
-              className="absolute left-1/2 top-1/2 h-[2px] w-[80%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-full bg-white/80"
+              className={`pointer-events-none absolute inset-0 rounded-card ${SELECTED_OVERLAY_CLASSES[playerColor]}`}
+            />
+          ) : hinted ? (
+            <span
+              aria-hidden
+              className="animate-ring-pulse pointer-events-none absolute inset-0 rounded-card bg-hint-400/35 ring-2 ring-inset ring-hint-500"
             />
           ) : null}
+          <span className="relative font-bold">
+            {square.card.rank}
+            {SUIT_SYMBOLS[square.card.suit]}
+          </span>
+        </>
+      )}
+
+      {chip ? (
+        <span
+          className={`animate-chip-place absolute inset-[13%] rounded-full shadow-chip ${CHIP_CLASSES[chip]} ${
+            inSequence ? "opacity-30 saturate-75" : "opacity-55"
+          }`}
+        >
+          <span aria-hidden className="absolute inset-[16%] rounded-full border border-white/25" />
         </span>
       ) : null}
     </button>

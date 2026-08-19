@@ -14,9 +14,9 @@ interface ScoreboardProps {
 }
 
 const CHIP_DOT_CLASSES: Record<ChipColor, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
+  red: "bg-gradient-to-br from-chip-red to-chip-red-strong",
+  blue: "bg-gradient-to-br from-chip-blue to-chip-blue-strong",
+  green: "bg-gradient-to-br from-chip-green to-chip-green-strong",
 };
 
 interface ScoreEntry {
@@ -84,16 +84,16 @@ export default function Scoreboard({
             key={e.key}
             className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
               e.isMine
-                ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
-                : "border-zinc-200 bg-white/70 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300"
+                ? "border-gold-500/70 bg-gold-200/30 text-panel-ink"
+                : "border-panel-border bg-panel text-panel-ink-soft"
             }`}
           >
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${CHIP_DOT_CLASSES[e.color]}`} />
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-chip ${CHIP_DOT_CLASSES[e.color]}`} />
             <span className="truncate" title={e.sublabel}>
               {e.label}
-              {e.sublabel ? <span className="text-zinc-400"> · {e.sublabel}</span> : null}
+              {e.sublabel ? <span className="text-panel-ink-soft"> · {e.sublabel}</span> : null}
             </span>
-            <span className="font-mono text-[0.7rem] text-zinc-400">
+            <span className="font-mono text-[0.7rem] text-panel-ink-soft">
               {e.count}/{sequencesToWin}
             </span>
           </span>
@@ -103,23 +103,23 @@ export default function Scoreboard({
   }
 
   return (
-    <div className="flex w-44 shrink-0 flex-col gap-2 rounded-xl border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 shadow-sm backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
-      <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Score</p>
+    <div className="flex w-44 shrink-0 flex-col gap-2 rounded-panel border border-panel-border bg-panel p-3 text-xs text-panel-ink-soft shadow-panel backdrop-blur-sm">
+      <p className="text-sm font-semibold text-panel-ink">Score</p>
       {entries.map((e) => (
         <div
           key={e.key}
-          className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${
-            e.isMine ? "bg-indigo-50 dark:bg-indigo-950/60" : ""
+          className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${
+            e.isMine ? "bg-gold-200/25" : ""
           }`}
         >
-          <span className={`h-3 w-3 shrink-0 rounded-full ${CHIP_DOT_CLASSES[e.color]}`} />
+          <span className={`h-3 w-3 shrink-0 rounded-full shadow-chip ${CHIP_DOT_CLASSES[e.color]}`} />
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate font-medium text-zinc-700 dark:text-zinc-200">
+            <span className="truncate font-medium text-panel-ink">
               {e.label}
               {e.isMine ? " (you)" : ""}
             </span>
             {e.sublabel ? (
-              <span className="truncate text-[0.65rem] text-zinc-400" title={e.sublabel}>
+              <span className="truncate text-[0.65rem] text-panel-ink-soft" title={e.sublabel}>
                 {e.sublabel}
               </span>
             ) : null}
@@ -129,7 +129,7 @@ export default function Scoreboard({
               <span
                 key={i}
                 className={`h-2 w-2 rounded-full ${
-                  i < e.count ? CHIP_DOT_CLASSES[e.color] : "bg-zinc-200 dark:bg-zinc-700"
+                  i < e.count ? CHIP_DOT_CLASSES[e.color] : "bg-card-border"
                 }`}
               />
             ))}

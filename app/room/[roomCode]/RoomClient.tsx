@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Board from "@/components/board/Board";
+import JackHelpButton from "@/components/game/JackHelpButton";
+import JackLegend from "@/components/game/JackLegend";
 import Scoreboard from "@/components/game/Scoreboard";
 import Hand from "@/components/hand/Hand";
 import WaitingRoom from "@/components/lobby/WaitingRoom";
@@ -20,9 +22,9 @@ interface RoomClientProps {
 }
 
 const CHIP_DOT_CLASSES: Record<ChipColor, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
+  red: "bg-gradient-to-br from-chip-red to-chip-red-strong",
+  blue: "bg-gradient-to-br from-chip-blue to-chip-blue-strong",
+  green: "bg-gradient-to-br from-chip-green to-chip-green-strong",
 };
 
 const CHIP_LABELS: Record<ChipColor, string> = {
@@ -88,11 +90,6 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   const selectedSquares = useMemo(
     () => new Set<SquareIndex>(selectedTargets?.squares ?? []),
     [selectedTargets],
-  );
-
-  const sequencedSquares = useMemo(
-    () => new Set<SquareIndex>(game?.sequences.flatMap((s) => s.squares) ?? []),
-    [game?.sequences],
   );
 
   // Jacks are excluded here for the same reason as the local demo: a
@@ -230,14 +227,14 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
 
   if (lookupError) {
     return (
-      <main className="flex h-dvh items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-zinc-500 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+      <main className="bg-felt flex h-dvh items-center justify-center text-felt-ink">
         {lookupError}
       </main>
     );
   }
   if (loading || !game) {
     return (
-      <main className="flex h-dvh items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 text-zinc-500 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+      <main className="bg-felt flex h-dvh items-center justify-center text-felt-ink/80">
         Loading room {roomCode}…
       </main>
     );
@@ -264,30 +261,33 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
   }
 
   return (
-    <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-2 sm:p-4 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+    <main className="bg-felt flex h-dvh w-full flex-col items-center gap-2 overflow-hidden p-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:p-4">
       <div className="flex w-full max-w-4xl shrink-0 items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-base font-semibold tracking-tight text-zinc-800 sm:text-lg dark:text-zinc-100">
-            Room <span className="font-mono">{game.room_code}</span>
+          <h1 className="text-base font-semibold tracking-tight text-felt-ink sm:text-lg">
+            Room <span className="font-mono tracking-widest text-gold-300">{game.room_code}</span>
           </h1>
           {myPlayer ? (
-            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${CHIP_DOT_CLASSES[myPlayer.chipColor]}`} />
+            <span className="flex items-center gap-1.5 rounded-full border border-panel-border bg-panel px-2 py-0.5 text-xs font-medium text-panel-ink">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-chip ${CHIP_DOT_CLASSES[myPlayer.chipColor]}`} />
               You: {CHIP_LABELS[myPlayer.chipColor]}
             </span>
           ) : null}
         </div>
-        {game.winner ? (
-          <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Game over</span>
-        ) : isMyTurn ? (
-          <span className="animate-pulse rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 text-xs font-bold text-white shadow-sm sm:text-sm">
-            Your turn!
-          </span>
-        ) : (
-          <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-500 sm:text-sm dark:bg-zinc-800 dark:text-zinc-400">
-            {turnLabel}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {game.winner ? (
+            <span className="text-sm font-medium text-felt-ink/70">Game over</span>
+          ) : isMyTurn ? (
+            <span className="animate-glow-breathe rounded-full bg-gradient-to-r from-gold-400 to-gold-600 px-3 py-1 text-xs font-bold text-ink-fixed shadow-card sm:text-sm">
+              Your turn!
+            </span>
+          ) : (
+            <span className="rounded-full border border-panel-border bg-panel px-3 py-1 text-xs font-medium text-panel-ink-soft sm:text-sm">
+              {turnLabel}
+            </span>
+          )}
+          <JackHelpButton />
+        </div>
       </div>
 
       <div className="w-full max-w-4xl shrink-0 lg:hidden">
@@ -301,11 +301,11 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
         />
       </div>
 
-      {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="shrink-0 text-sm text-red-300">{error}</p> : null}
 
       {game.winner ? (
-        <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-5 text-center shadow-xl dark:border-amber-900 dark:from-amber-950/60 dark:to-zinc-900">
-          <p className="bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-xl font-extrabold text-transparent">
+        <div className="animate-fade-slide-up flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-panel border border-gold-500/40 bg-gradient-to-b from-gold-200 to-parchment p-5 text-center shadow-panel">
+          <p className="bg-gradient-to-r from-gold-600 to-gold-700 bg-clip-text text-xl font-extrabold text-transparent">
             {winningLabel ?? "Game over!"}
           </p>
           {isHost ? (
@@ -314,7 +314,7 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
                 type="button"
                 disabled={rematching}
                 onClick={() => handleRematch(false)}
-                className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-xl bg-gradient-to-b from-gold-400 to-gold-600 py-2.5 text-sm font-semibold text-ink-fixed shadow-card transition hover:brightness-105 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {rematching ? "Starting…" : "Play again"}
               </button>
@@ -323,33 +323,31 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
                   type="button"
                   disabled={rematching}
                   onClick={() => handleRematch(true)}
-                  className="w-full rounded-xl border border-zinc-300 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  className="w-full rounded-xl border border-ink-fixed/20 py-2.5 text-sm font-semibold text-ink-fixed transition hover:bg-ink-fixed/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {rematching ? "Starting…" : "Shuffle teams & play again"}
                 </button>
               ) : null}
             </div>
           ) : (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Waiting for the host to start a rematch…
-            </p>
+            <p className="text-sm text-ink-fixed-soft">Waiting for the host to start a rematch…</p>
           )}
           <button
             type="button"
             onClick={handleExit}
-            className="text-sm text-zinc-500 underline underline-offset-2 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
+            className="text-sm text-ink-fixed-soft underline underline-offset-2 hover:text-gold-700"
           >
             Exit to home
           </button>
         </div>
       ) : selectedCardIsDead ? (
-        <div className="flex shrink-0 items-center gap-2 rounded-lg bg-red-100 px-3 py-1 text-sm text-red-800 dark:bg-red-900/40 dark:text-red-200">
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-red-suit/30 bg-red-suit/10 px-3 py-1 text-sm text-red-suit">
           This card is dead.
           <button
             type="button"
             disabled={isSubmitting}
             onClick={() => selectedCard && swapDeadCard(selectedCard)}
-            className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            className="rounded bg-red-suit px-2 py-0.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
           >
             Discard &amp; draw
           </button>
@@ -361,7 +359,8 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
           chips={game.board_chips}
           selectedSquares={selectedSquares}
           hintSquares={hintSquares}
-          sequencedSquares={sequencedSquares}
+          sequences={game.sequences}
+          playerColor={myPlayer?.chipColor ?? "red"}
           onSquareClick={handleSquareClick}
         />
 
@@ -373,24 +372,11 @@ export default function RoomClient({ roomCode }: RoomClientProps) {
             sequencesToWin={game.sequences_to_win}
             myPlayerId={myPlayerId}
           />
-
-          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 shadow-sm backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
-            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Jack cards</p>
-            <div className="flex items-start gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG */}
-              <img src="/cards/jack-clubs.svg" alt="Two-eyed jack" className="mt-0.5 h-9 w-auto shrink-0 rounded border border-zinc-200 dark:border-zinc-700" />
-              <span>Two-eyed jack (both eyes) — wild, place anywhere</span>
-            </div>
-            <div className="flex items-start gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG */}
-              <img src="/cards/jack-hearts.svg" alt="One-eyed jack" className="mt-0.5 h-9 w-auto shrink-0 rounded border border-zinc-200 dark:border-zinc-700" />
-              <span>One-eyed jack (profile) — anti-wild, remove one opponent chip</span>
-            </div>
-          </div>
+          <JackLegend />
         </div>
       </div>
 
-      <div className="w-full max-w-4xl shrink-0 rounded-2xl border border-white/60 bg-white/70 p-2 shadow-sm backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/70">
+      <div className="w-full max-w-4xl shrink-0 rounded-panel border border-panel-border bg-panel p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-panel backdrop-blur-sm">
         <Hand
           cards={myHand}
           selectedInstanceId={selectedInstanceId}

@@ -1,8 +1,68 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   Design tokens — "felt & gold" tabletop theme, shared by every screen.
+   Theme-dependent tokens (things that differ light vs dark) live as plain
+   CSS variables on :root, overridden under prefers-color-scheme: dark, then
+   re-exposed as Tailwind utilities via `@theme inline` (same pattern the
+   Next.js starter already used for --background/--foreground below) — so a
+   component just writes `bg-card-face` or `text-ink` once and gets correct
+   light/dark values for free, with no `dark:` variant needed at the call
+   site. Tokens that are the same in both themes (gold accent, chip colors,
+   radii, shadows, easing) are declared directly in the static `@theme`
+   block instead.
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Page surface — a card-table felt gradient instead of flat white. The
+     felt itself is a dark surface in BOTH themes (that's the point of the
+     "soft, deep surface" direction) — so text sitting directly on it
+     (headers, taglines, pills) needs a light color that stays constant
+     across light/dark, not one that flips with the theme like the card
+     face does. That's --felt-ink below: deliberately NOT redefined in the
+     dark media query. */
+  --felt-from: #3d5a45;
+  --felt-to: #16241c;
+  --felt-ink: #f3ecdb;
+
+  /* Card face (board cells + hand cards) */
+  --card-face: #faf5ea;
+  --card-face-soft: #f3ecdb;
+  --card-border: #e2d5b8;
+  --ink: #221d15;
+  --ink-soft: #6b6152;
+  --red-suit: #c23b3b;
+
+  /* Glass panels (score, jack legend, lobby cards) */
+  --panel-bg: rgba(255, 255, 255, 0.82);
+  --panel-border: rgba(255, 255, 255, 0.6);
+  --panel-ink: #221d15;
+  --panel-ink-soft: #6b6152;
+
+  --background: var(--felt-to);
+  --foreground: var(--card-face);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --felt-from: #16241c;
+    --felt-to: #070c09;
+
+    --card-face: #221f19;
+    --card-face-soft: #2b2620;
+    --card-border: #3a352a;
+    --ink: #ece3cf;
+    --ink-soft: #a89e8a;
+    --red-suit: #ff6b6b;
+
+    --panel-bg: rgba(22, 20, 16, 0.8);
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --panel-ink: #ece3cf;
+    --panel-ink-soft: #a89e8a;
+
+    --background: var(--felt-to);
+    --foreground: var(--card-face);
+  }
 }
 
 @theme inline {
@@ -10,17 +70,200 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-card-face: var(--card-face);
+  --color-card-face-soft: var(--card-face-soft);
+  --color-card-border: var(--card-border);
+  --color-felt-ink: var(--felt-ink);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-red-suit: var(--red-suit);
+
+  --color-panel: var(--panel-bg);
+  --color-panel-border: var(--panel-border);
+  --color-panel-ink: var(--panel-ink);
+  --color-panel-ink-soft: var(--panel-ink-soft);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  /* Warm gold accent — corners, turn indicator, primary CTAs */
+  --color-gold-200: #f7e3ae;
+  --color-gold-300: #f0d190;
+  --color-gold-400: #e6b565;
+  --color-gold-500: #d6a44c;
+  --color-gold-600: #b8863a;
+  --color-gold-700: #8f682c;
+
+  /* Fixed (non-theme-flipping) ink/parchment pair — for anything painted on
+     a solid gold surface (buttons, badges, pills, the winner banner). Gold
+     itself doesn't flip between themes, so its text can't either: pairing
+     it with the theme-flipping --ink would put light cream text on gold in
+     dark mode, which fails contrast. */
+  --color-ink-fixed: #221d15;
+  --color-ink-fixed-soft: #6b6152;
+  --color-parchment: #faf5ea;
+  --color-parchment-soft: #f3ecdb;
+
+  /* Legal-move shading — deliberately NOT gold, since gold is already the
+     brand accent (corners, buttons, turn indicator); reusing it for "you
+     can play here" made every gold thing on screen compete for attention.
+     A cool teal reads as a distinct, unambiguous "actionable" signal. */
+  --color-hint-400: #35b9a9;
+  --color-hint-500: #1f9689;
+
+  /* Jewel-tone player chips — same across themes, opaque enough to read anywhere */
+  --color-chip-red: #d64545;
+  --color-chip-red-strong: #b53232;
+  --color-chip-blue: #3b6fd6;
+  --color-chip-blue-strong: #2c56ad;
+  --color-chip-green: #3fa66a;
+  --color-chip-green-strong: #2f8452;
+
+  /* Board's outer frame — a warm wood/bronze bevel, same in both themes */
+  --color-frame-100: #5c4530;
+  --color-frame-900: #2a1e12;
+
+  --radius-card: 0.625rem;
+  --radius-panel: 1.25rem;
+  --radius-frame: 1.75rem;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.1);
+  --shadow-card-lift: 0 6px 14px -4px rgba(0, 0, 0, 0.35);
+  --shadow-panel: 0 20px 45px -18px rgba(0, 0, 0, 0.55);
+  --shadow-frame: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 25px 60px -18px rgba(0, 0, 0, 0.6);
+  --shadow-chip: 0 2px 3px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.35), inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+
+  --ease-board: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+html {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background-color: var(--felt-to);
+  background-image:
+    radial-gradient(ellipse 120% 70% at 50% -10%, color-mix(in srgb, var(--felt-from) 85%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 140% 90% at 50% 115%, var(--felt-from) 0%, var(--felt-to) 70%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.025) 0px, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 3px);
+}
+
+::selection {
+  background: var(--color-gold-400);
+  color: var(--ink);
+}
+
+/* Consistent, visible keyboard focus everywhere — replaces the browser
+   default so it reads on both the felt background and card faces. */
+:focus-visible {
+  outline: 2px solid var(--color-gold-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Shared utility classes (things that aren't a natural Tailwind utility:
+   the radial felt background used as a reusable class, and the keyframe
+   animations referenced from component classNames).
+   ========================================================================== */
+
+.bg-felt {
+  background-color: var(--felt-to);
+  background-image: radial-gradient(ellipse 130% 90% at 50% -5%, var(--felt-from) 0%, var(--felt-to) 75%);
+}
+
+/* transform-only on purpose: a keyframe that also touched `opacity` would
+   win the cascade over the static opacity-* utility on this same element
+   (CSS animations override regular declarations for the properties they
+   touch, regardless of specificity) — which silently pinned every chip
+   back to fully opaque after the 260ms animation finished, no matter what
+   opacity class was applied. See the chip transparency note in BoardSquare. */
+@keyframes chip-place {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-chip-place {
+  animation: chip-place 260ms var(--ease-board) both;
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+.animate-ring-pulse {
+  animation: ring-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+.animate-glow-breathe {
+  animation: glow-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-slide-up {
+  animation: fade-slide-up 420ms var(--ease-board) both;
+}
+
+@keyframes dot-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.animate-dot-blink {
+  animation: dot-blink 1.4s ease-in-out infinite;
+}
+
+/* Respect the OS-level motion preference globally, once, rather than
+   gating every individual animation/transition at its call site. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

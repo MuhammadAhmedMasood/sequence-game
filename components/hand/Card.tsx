@@ -33,6 +33,9 @@ interface CardProps {
   onClick?: () => void;
 }
 
+const FRAME_CLASSES =
+  "flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded-card border bg-gradient-to-b from-card-face-soft to-card-face shadow-card transition-[transform,box-shadow] duration-150 ease-board hover:-translate-y-1.5 hover:shadow-card-lift active:translate-y-0 sm:h-24 sm:w-16";
+
 export default function Card({ card, selected = false, onClick }: CardProps) {
   const isRed = RED_SUITS.has(card.suit);
 
@@ -44,15 +47,17 @@ export default function Card({ card, selected = false, onClick }: CardProps) {
         type="button"
         onClick={onClick}
         title={isOneEyed ? "One-eyed jack — remove an opponent's chip" : "Two-eyed jack — wild, place anywhere"}
-        className={`flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 bg-white shadow-sm transition-transform hover:-translate-y-1 sm:h-20 sm:w-14 ${
-          selected ? "border-blue-500 ring-2 ring-blue-300" : "border-zinc-300"
+        className={`${FRAME_CLASSES} ${
+          selected
+            ? "-translate-y-1.5 border-gold-500 ring-2 ring-gold-400 ring-offset-1 ring-offset-transparent"
+            : "border-card-border"
         }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG, no benefit from next/image's raster pipeline */}
         <img
           src={JACK_IMAGES[card.suit]}
           alt={`Jack of ${card.suit}`}
-          className="h-full w-full object-contain"
+          className="h-full w-full object-contain p-0.5"
         />
       </button>
     );
@@ -62,16 +67,14 @@ export default function Card({ card, selected = false, onClick }: CardProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-14 w-10 shrink-0 flex-col items-center justify-center rounded-lg border-2 bg-white font-semibold shadow-sm transition-transform hover:-translate-y-1 sm:h-20 sm:w-14 ${
+      className={`relative flex-col gap-0.5 font-semibold ${FRAME_CLASSES} ${
         selected
-          ? "border-blue-500 ring-2 ring-blue-300"
-          : "border-zinc-300"
-      } ${isRed ? "text-red-600" : "text-zinc-900"}`}
+          ? "-translate-y-1.5 border-gold-500 ring-2 ring-gold-400 ring-offset-1 ring-offset-transparent"
+          : "border-card-border"
+      } ${isRed ? "text-red-suit" : "text-ink"}`}
     >
-      <span className="text-sm leading-none sm:text-lg">{card.rank}</span>
-      <span className="text-lg leading-none sm:text-2xl">
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
+      <span className="relative text-base leading-none sm:text-2xl">{card.rank}</span>
+      <span className="relative text-xl leading-none sm:text-3xl">{SUIT_SYMBOLS[card.suit]}</span>
     </button>
   );
 }

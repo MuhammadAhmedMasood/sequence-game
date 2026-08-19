@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Board from "@/components/board/Board";
+import JackHelpButton from "@/components/game/JackHelpButton";
+import JackLegend from "@/components/game/JackLegend";
 import Hand from "@/components/hand/Hand";
 import OnlinePlayPanel from "@/components/lobby/OnlinePlayPanel";
 import { dealHands } from "@/lib/game/deal";
@@ -110,9 +112,9 @@ function createLocalGame(mode: GameMode, sequencesToWin: number): LocalGameState
 }
 
 const CHIP_TEXT_CLASSES: Record<ChipColor, string> = {
-  red: "text-red-600",
-  blue: "text-blue-600",
-  green: "text-green-600",
+  red: "text-chip-red-strong",
+  blue: "text-chip-blue-strong",
+  green: "text-chip-green-strong",
 };
 
 export default function Home() {
@@ -166,11 +168,6 @@ export default function Home() {
     [selectedTargets],
   );
 
-  const sequencedSquares = useMemo<Set<SquareIndex>>(
-    () => new Set(game?.sequences.flatMap((s) => s.squares) ?? []),
-    [game?.sequences],
-  );
-
   // Jacks are excluded from the ambient hint highlight: a two-eyed jack
   // matches every open square, so including it would flood the whole
   // board green. Its own squares still show up in `selectedSquares` once
@@ -216,26 +213,34 @@ export default function Home() {
   // until the local hot-seat game finished initializing.)
   if (showOnlinePanel) {
     return (
-      <main className="relative flex min-h-dvh w-full flex-col items-center justify-center gap-8 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 py-10 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950">
+      <main className="bg-felt relative flex min-h-dvh w-full flex-col items-center justify-center gap-8 overflow-hidden p-4 py-10">
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-300/30 blur-3xl dark:bg-indigo-700/20"
+          className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-gold-400/10 blur-3xl"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-purple-300/30 blur-3xl dark:bg-purple-700/20"
+          className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-gold-500/10 blur-3xl"
         />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex select-none items-center justify-center text-[28rem] leading-none font-black text-felt-ink/[0.025]"
+        >
+          ♠
+        </div>
 
-        <div className="relative flex flex-col items-center gap-3 text-center">
+        <div className="animate-fade-slide-up relative flex flex-col items-center gap-3 text-center">
           <div className="flex items-center gap-2">
-            {["bg-red-500", "bg-blue-500", "bg-green-500"].map((c) => (
-              <span key={c} className={`h-3.5 w-3.5 rounded-full shadow-sm ${c}`} />
-            ))}
+            {["bg-gradient-to-br from-chip-red to-chip-red-strong", "bg-gradient-to-br from-chip-blue to-chip-blue-strong", "bg-gradient-to-br from-chip-green to-chip-green-strong"].map(
+              (c) => (
+                <span key={c} className={`h-3.5 w-3.5 rounded-full shadow-chip ${c}`} />
+              ),
+            )}
           </div>
-          <h1 className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent sm:text-5xl">
+          <h1 className="bg-gradient-to-b from-gold-300 to-gold-500 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent sm:text-5xl">
             Sequence
           </h1>
-          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="max-w-xs text-sm text-felt-ink/70">
             Play the classic board game online with friends — no downloads, no accounts.
           </p>
         </div>
@@ -247,7 +252,7 @@ export default function Home() {
         <button
           type="button"
           onClick={() => setShowOnlinePanel(false)}
-          className="relative text-sm text-zinc-500 underline underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-400"
+          className="relative text-sm text-felt-ink/60 underline underline-offset-2 transition hover:text-gold-300"
         >
           Practice locally instead
         </button>
@@ -257,10 +262,8 @@ export default function Home() {
 
   if (!game || !currentPlayer) {
     return (
-      <main className="flex h-dvh w-full items-center justify-center">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Setting up the game…
-        </p>
+      <main className="bg-felt flex h-dvh w-full items-center justify-center">
+        <p className="text-sm text-felt-ink/70">Setting up the game…</p>
       </main>
     );
   }
@@ -415,10 +418,10 @@ export default function Home() {
   }
 
   return (
-    <main className="flex h-dvh w-full flex-col items-center gap-2 overflow-hidden p-2 sm:p-4">
+    <main className="bg-felt flex h-dvh w-full flex-col items-center gap-2 overflow-hidden p-2 sm:p-4">
       <div className="flex w-full max-w-4xl shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
+          <h1 className="text-lg font-semibold tracking-tight text-felt-ink sm:text-xl">
             Sequence
           </h1>
           <select
@@ -427,7 +430,7 @@ export default function Home() {
               setGame(createLocalGame(e.target.value as GameMode, sequencesToWin));
               setSelectedInstanceId(null);
             }}
-            className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs sm:text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className="rounded border border-panel-border bg-panel px-1 py-0.5 text-xs text-panel-ink sm:text-sm"
           >
             <option value="two-player">2 Player</option>
             <option value="three-player">3 Player</option>
@@ -443,16 +446,16 @@ export default function Home() {
               ? "Game over"
               : `${activePlayer.displayName}'s turn`}
           </span>
-          <label className="flex cursor-pointer items-center gap-1 text-xs text-zinc-600 sm:text-sm dark:text-zinc-300">
+          <label className="flex cursor-pointer items-center gap-1 text-xs text-felt-ink/80 sm:text-sm">
             <input
               type="checkbox"
               checked={hintsEnabled}
               onChange={(e) => setHintsEnabled(e.target.checked)}
-              className="h-4 w-4 accent-emerald-500"
+              className="h-4 w-4 accent-gold-500"
             />
             Hints
           </label>
-          <label className="flex items-center gap-1 text-xs text-zinc-600 sm:text-sm dark:text-zinc-300">
+          <label className="flex items-center gap-1 text-xs text-felt-ink/80 sm:text-sm">
             Sequences to win
             <select
               value={sequencesToWin}
@@ -462,7 +465,7 @@ export default function Home() {
                 setGame(createLocalGame(activeGame.mode, value));
                 setSelectedInstanceId(null);
               }}
-              className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs sm:text-sm dark:border-zinc-600 dark:bg-zinc-800"
+              className="rounded border border-panel-border bg-panel px-1 py-0.5 text-xs text-panel-ink sm:text-sm"
             >
               <option value={1}>1</option>
               <option value={2}>2</option>
@@ -471,24 +474,25 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setShowOnlinePanel(true)}
-            className="rounded border border-blue-500 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 sm:text-sm dark:hover:bg-blue-950"
+            className="rounded border border-gold-500 px-2 py-0.5 text-xs font-medium text-gold-300 transition hover:bg-gold-400/10 sm:text-sm"
           >
             Play online
           </button>
+          <JackHelpButton />
         </div>
       </div>
 
       {activeGame.winner ? (
-        <div className="shrink-0 rounded bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        <div className="animate-fade-slide-up shrink-0 rounded-full bg-gradient-to-r from-gold-400 to-gold-600 px-3 py-1 text-sm font-semibold text-ink-fixed shadow-card">
           {winningLabel}
         </div>
       ) : selectedCardIsDead ? (
-        <div className="flex shrink-0 items-center gap-2 rounded bg-red-100 px-3 py-1 text-sm text-red-800 dark:bg-red-900/40 dark:text-red-200">
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-red-suit/30 bg-red-suit/10 px-3 py-1 text-sm text-red-suit">
           This card is dead — both its squares are covered.
           <button
             type="button"
             onClick={handleDeadCardSwap}
-            className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-red-700"
+            className="rounded bg-red-suit px-2 py-0.5 text-xs font-semibold text-white transition hover:brightness-110"
           >
             Discard &amp; draw
           </button>
@@ -500,28 +504,17 @@ export default function Home() {
           chips={activeGame.board}
           selectedSquares={selectedSquares}
           hintSquares={hintSquares}
-          sequencedSquares={sequencedSquares}
+          sequences={activeGame.sequences}
+          playerColor={activePlayer.chipColor}
           onSquareClick={handleSquareClick}
         />
 
-        <div className="hidden w-44 shrink-0 flex-col gap-3 self-center rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600 shadow-sm lg:flex dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">
-            Jack cards
-          </p>
-          <div className="flex items-start gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG */}
-            <img src="/cards/jack-clubs.svg" alt="Two-eyed jack" className="mt-0.5 h-9 w-auto shrink-0 rounded border border-zinc-200 dark:border-zinc-700" />
-            <span>Two-eyed jack (both eyes) — wild, place anywhere</span>
-          </div>
-          <div className="flex items-start gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element -- local static SVG */}
-            <img src="/cards/jack-hearts.svg" alt="One-eyed jack" className="mt-0.5 h-9 w-auto shrink-0 rounded border border-zinc-200 dark:border-zinc-700" />
-            <span>One-eyed jack (profile) — anti-wild, remove one opponent chip</span>
-          </div>
+        <div className="hidden self-center lg:flex">
+          <JackLegend />
         </div>
       </div>
 
-      <div className="w-full max-w-4xl shrink-0">
+      <div className="w-full max-w-4xl shrink-0 rounded-panel border border-panel-border bg-panel p-2 shadow-panel backdrop-blur-sm">
         <Hand
           cards={currentHand}
           selectedInstanceId={selectedInstanceId}
