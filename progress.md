@@ -85,15 +85,35 @@ pointing at the `sequence-game-steel.vercel.app` deployment) — see
     placed chips are translucent (55% normally, 30% once part of a
     sequence) so the card's rank/suit stays legible underneath — both
     changes were direct user feedback after the first pass looked too
-    opaque/cluttered. Legal-move shading uses a new teal token instead of
+    opaque/cluttered. Legal-move shading uses a new hint token instead of
     gold, since gold was already the accent color everywhere else and
-    competed with itself. New shared `JackLegend`/`JackHelpButton`
+    competed with itself (this started as teal, then became violet — see
+    item 15). New shared `JackLegend`/`JackHelpButton`
     components (deduped the old copy-pasted sidebar panel across two
     files) add a mobile bottom-sheet popover for the jack-rules
     explanation, previously invisible on phones. README screenshots
     regenerated to match. See "Hard-won bugs" #12–14 for three real bugs
     hit along the way (dark-mode contrast, an animation silently
     overriding chip opacity, and a board-sizing bug).
+15. **Chip/hint color-contrast fixes** (2026-08-20), all reported live by
+    the user while playing a 3-player game: (a) the legal-move hint tile
+    was teal, which read too close to the green (3rd-player) chip color —
+    swapped the hint token to violet (`--color-hint-400/500`), a hue with
+    no overlap with any of the three chip colors or the gold accent. (b)
+    Separately, the *selected*-square tile (the one strong highlight for
+    the card actually chosen, as opposed to the ambient hint state) filled
+    the whole cell in the acting player's own chip color — for the green
+    player this made an empty "you can place here" tile look identical to
+    a square that already had a green chip on it. Changed the fill to a
+    neutral gold wash (matching the turn-indicator hue) with only a thin
+    ring kept in the player's chip color for identity
+    (`SELECTED_OVERLAY_CLASSES` in `BoardSquare.tsx`). (c) With the hint
+    tile now violet, the 2nd player's blue chip sat too close to it —
+    darkened `--color-chip-blue`/`-strong` from a lighter sky blue toward
+    navy (`#1d4ed8`/`#1a3a8f`, lower on the red channel) so it reads as
+    clearly distinct from violet. All three verified visually via browser
+    automation (placing real chips next to hint/selected tiles in a local
+    3-player game and zooming in), plus the full test suite and build.
 
 `npm run build` and `npm run test` are both green as of the last commit.
 Pushed to GitHub — see "Repository" below.
@@ -168,7 +188,7 @@ Pushed to GitHub — see "Repository" below.
   Tailwind utilities via `@theme inline` — so `bg-card-face`/`text-ink`/etc.
   pick up the right light/dark value with no `dark:` variant needed at the
   call site. Theme-independent tokens (gold accent scale, chip colors,
-  radii, shadows, the teal "legal move" color) live in a plain `@theme`
+  radii, shadows, the violet "legal move" hint color) live in a plain `@theme`
   block. One exception to the "theme-flipping var" pattern: `--felt-ink`,
   for text painted directly on the felt background — the felt itself is
   dark in *both* themes, so that text needs a light color that stays
